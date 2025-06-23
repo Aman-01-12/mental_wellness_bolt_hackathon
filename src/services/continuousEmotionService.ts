@@ -79,32 +79,30 @@ class ContinuousEmotionService {
     timestamp: Date = new Date(),
     responseDelay?: number
   ): Promise<ComprehensiveEmotionalAssessment> {
-    try {
-      // Get or create conversation context
-      let context = this.conversationContexts.get(userId);
-      if (!context) {
-        context = this.initializeContext(userId);
-        this.conversationContexts.set(userId, context);
-      }
+    console.log('🧠 Starting continuous emotion analysis for user:', userId);
+    console.log('📝 Message:', message.substring(0, 100) + '...');
 
-      // Analyze current message with Claude
-      const currentAnalysis = await this.analyzeWithClaude(message, context);
-
-      // Update conversation context
-      this.updateContext(context, message, timestamp, currentAnalysis, responseDelay);
-
-      // Perform comprehensive analysis
-      const assessment = await this.generateComprehensiveAssessment(context, currentAnalysis);
-
-      // Update user baseline
-      this.updateUserBaseline(userId, context, currentAnalysis);
-
-      return assessment;
-
-    } catch (error) {
-      console.error('Error in continuous emotion analysis:', error);
-      throw error;
+    // Get or create conversation context
+    let context = this.conversationContexts.get(userId);
+    if (!context) {
+      context = this.initializeContext(userId);
+      this.conversationContexts.set(userId, context);
     }
+
+    // Analyze current message with Claude - NO FALLBACK
+    const currentAnalysis = await this.analyzeWithClaude(message, context);
+
+    // Update conversation context
+    this.updateContext(context, message, timestamp, currentAnalysis, responseDelay);
+
+    // Perform comprehensive analysis
+    const assessment = await this.generateComprehensiveAssessment(context, currentAnalysis);
+
+    // Update user baseline
+    this.updateUserBaseline(userId, context, currentAnalysis);
+
+    console.log('✅ Continuous emotion analysis complete:', assessment);
+    return assessment;
   }
 
   private initializeContext(userId: string): ConversationContext {
@@ -175,92 +173,46 @@ ANALYSIS REQUIREMENTS:
 
 Respond in JSON format with detailed analysis covering all aspects above. Be thorough and nuanced in your assessment.`;
 
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.anthropicApiKey,
-          'anthropic-version': '2023-06-01'
-        },
-        body: JSON.stringify({
-          model: 'claude-3-sonnet-20240229',
-          max_tokens: 2000,
-          messages: [{
-            role: 'user',
-            content: prompt
-          }]
-        })
-      });
+    console.log('🤖 Calling Claude API for advanced analysis...');
 
-      if (!response.ok) {
-        throw new Error(`Claude API error: ${response.status}`);
-      }
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.anthropicApiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: 'claude-3-sonnet-20240229',
+        max_tokens: 2000,
+        messages: [{
+          role: 'user',
+          content: prompt
+        }]
+      })
+    });
 
-      const data = await response.json();
-      const analysisText = data.content[0].text;
-      
-      // Parse JSON response
-      try {
-        return JSON.parse(analysisText);
-      } catch (parseError) {
-        // Fallback if JSON parsing fails
-        return this.fallbackAnalysis(message, context);
-      }
-
-    } catch (error) {
-      console.error('Claude API error:', error);
-      return this.fallbackAnalysis(message, context);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Claude API error:', response.status, errorText);
+      throw new Error(`Claude API error: ${response.status} - ${errorText}`);
     }
-  }
 
-  private fallbackAnalysis(message: string, context: ConversationContext): any {
-    // Sophisticated fallback analysis
-    const words = message.toLowerCase().split(/\s+/);
-    const sentences = message.split(/[.!?]+/).filter(s => s.trim());
+    const data = await response.json();
+    const analysisText = data.content[0].text;
     
-    // Basic emotion detection
-    const emotionKeywords = {
-      anxious: ['worried', 'nervous', 'scared', 'panic', 'stress', 'overwhelmed'],
-      sad: ['sad', 'depressed', 'down', 'upset', 'crying', 'lonely'],
-      angry: ['angry', 'mad', 'furious', 'frustrated', 'annoyed', 'hate'],
-      happy: ['happy', 'joy', 'excited', 'great', 'wonderful', 'love'],
-      confused: ['confused', 'lost', 'unsure', 'unclear', 'puzzled']
-    };
+    console.log('📊 Claude raw response:', analysisText);
 
-    let primaryEmotion = 'neutral';
-    let maxScore = 0;
-
-    for (const [emotion, keywords] of Object.entries(emotionKeywords)) {
-      const score = keywords.reduce((count, keyword) => {
-        return count + (words.includes(keyword) ? 1 : 0);
-      }, 0);
-      
-      if (score > maxScore) {
-        maxScore = score;
-        primaryEmotion = emotion;
-      }
+    // Parse JSON response - NO FALLBACK
+    try {
+      const parsedAnalysis = JSON.parse(analysisText);
+      console.log('✅ Claude analysis parsed successfully:', parsedAnalysis);
+      return parsedAnalysis;
+    } catch (parseError) {
+      console.error('❌ Failed to parse Claude response as JSON:', parseError);
+      console.error('Raw response:', analysisText);
+      throw new Error(`Failed to parse Claude response: ${parseError.message}`);
     }
-
-    return {
-      emotionalState: {
-        primaryEmotion,
-        confidence: Math.min(maxScore * 0.3, 1),
-        intensity: sentences.length > 3 ? 0.7 : 0.5,
-        stability: 0.6
-      },
-      contextualFactors: {
-        conversationFlow: 'continuing',
-        responsePatterns: 'normal',
-        languageShifts: [],
-        culturalIndicators: []
-      },
-      riskAssessment: {
-        level: 'low',
-        factors: [],
-        recommendations: []
-      }
-    };
   }
 
   private updateContext(

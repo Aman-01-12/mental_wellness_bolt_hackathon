@@ -277,145 +277,90 @@ function calculateAdvancedMentalHealthIndicators(
   };
 }
 
-function advancedFallbackAnalysis(text: string): EmotionAnalysis {
-  console.log('Using advanced fallback emotion analysis');
-  
-  const context = analyzeContext(text);
-  console.log('Context analysis:', context);
-  
-  // More sophisticated emotion detection based on context
-  const emotionScores: EmotionResult[] = [];
-  
-  // Use context themes to determine emotions
-  for (const theme of context.underlying_themes) {
-    if (theme in contextPatterns) {
-      emotionScores.push({
-        label: theme,
-        score: Math.min(0.6 + (context.intensity * 0.4), 1)
-      });
-    }
-  }
-
-  // If no themes detected, use basic sentiment analysis
-  if (emotionScores.length === 0) {
-    const positiveWords = ['good', 'great', 'happy', 'love', 'amazing', 'wonderful', 'excellent', 'fantastic'];
-    const negativeWords = ['bad', 'terrible', 'awful', 'hate', 'horrible', 'worst', 'sad', 'angry'];
-    
-    const lowerText = text.toLowerCase();
-    const positiveCount = positiveWords.filter(word => lowerText.includes(word)).length;
-    const negativeCount = negativeWords.filter(word => lowerText.includes(word)).length;
-    
-    if (positiveCount > negativeCount) {
-      emotionScores.push({ label: 'positive', score: 0.6 + (context.intensity * 0.3) });
-    } else if (negativeCount > positiveCount) {
-      emotionScores.push({ label: 'sad', score: 0.6 + (context.intensity * 0.3) });
-    } else {
-      emotionScores.push({ label: 'neutral', score: 0.5 });
-    }
-  }
-
-  // Sort by score
-  emotionScores.sort((a, b) => b.score - a.score);
-
-  const mentalHealthIndicators = calculateAdvancedMentalHealthIndicators(text, emotionScores, context);
-
-  return {
-    primary_emotion: emotionScores[0].label,
-    confidence: emotionScores[0].score,
-    all_emotions: emotionScores,
-    mental_health_indicators: mentalHealthIndicators,
-    context_analysis: context
-  };
-}
-
 async function analyzeEmotionWithHuggingFace(text: string): Promise<EmotionAnalysis> {
   const huggingFaceApiKey = Deno.env.get('HUGGINGFACE_API_KEY');
   
   if (!huggingFaceApiKey) {
-    console.warn('HuggingFace API key not found, using advanced fallback analysis');
-    return advancedFallbackAnalysis(text);
+    console.error('❌ HuggingFace API key not found - NO FALLBACK AVAILABLE');
+    throw new Error('HuggingFace API key not configured');
   }
 
-  try {
-    console.log('Calling HuggingFace API for emotion analysis');
-    
-    const response = await fetch(
-      'https://api-inference.huggingface.co/models/SamLowe/roberta-base-go_emotions',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${huggingFaceApiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: text,
-          options: {
-            wait_for_model: true
-          }
-        })
-      }
-    );
-
-    if (!response.ok) {
-      console.warn(`HuggingFace API error: ${response.status}, falling back to advanced analysis`);
-      return advancedFallbackAnalysis(text);
+  console.log('🤖 Calling HuggingFace API for emotion analysis');
+  
+  const response = await fetch(
+    'https://api-inference.huggingface.co/models/SamLowe/roberta-base-go_emotions',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${huggingFaceApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        inputs: text,
+        options: {
+          wait_for_model: true
+        }
+      })
     }
+  );
 
-    const results: HuggingFaceResponse[] = await response.json();
-    console.log('HuggingFace raw results:', results);
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`❌ HuggingFace API error: ${response.status} - ${errorText}`);
+    throw new Error(`HuggingFace API error: ${response.status} - ${errorText}`);
+  }
+
+  const results: HuggingFaceResponse[] = await response.json();
+  console.log('📊 HuggingFace raw results:', results);
+  
+  if (!Array.isArray(results) || results.length === 0) {
+    throw new Error('Invalid response from HuggingFace API');
+  }
+
+  // Sort by confidence score
+  const sortedEmotions = results.sort((a, b) => b.score - a.score);
+  
+  // Map to our emotion categories and enhance with context
+  const mappedEmotions: EmotionResult[] = sortedEmotions.map(emotion => ({
+    label: emotionMapping[emotion.label] || emotion.label,
+    score: emotion.score
+  }));
+
+  // Analyze context for additional insights
+  const context = analyzeContext(text);
+  console.log('🎯 Context analysis:', context);
+  
+  // Enhance emotion scores based on context
+  const enhancedEmotions = mappedEmotions.map(emotion => {
+    let enhancedScore = emotion.score;
     
-    if (!Array.isArray(results) || results.length === 0) {
-      return advancedFallbackAnalysis(text);
+    // Boost scores if context themes align with detected emotions
+    if (context.underlying_themes.includes(emotion.label)) {
+      enhancedScore = Math.min(enhancedScore + (context.intensity * 0.2), 1);
     }
-
-    // Sort by confidence score
-    const sortedEmotions = results.sort((a, b) => b.score - a.score);
     
-    // Map to our emotion categories and enhance with context
-    const mappedEmotions: EmotionResult[] = sortedEmotions.map(emotion => ({
-      label: emotionMapping[emotion.label] || emotion.label,
-      score: emotion.score
-    }));
-
-    // Analyze context for additional insights
-    const context = analyzeContext(text);
-    
-    // Enhance emotion scores based on context
-    const enhancedEmotions = mappedEmotions.map(emotion => {
-      let enhancedScore = emotion.score;
-      
-      // Boost scores if context themes align with detected emotions
-      if (context.underlying_themes.includes(emotion.label)) {
-        enhancedScore = Math.min(enhancedScore + (context.intensity * 0.2), 1);
-      }
-      
-      return {
-        ...emotion,
-        score: enhancedScore
-      };
-    });
-
-    // Re-sort after enhancement
-    enhancedEmotions.sort((a, b) => b.score - a.score);
-
-    // Calculate mental health indicators with context awareness
-    const mentalHealthIndicators = calculateAdvancedMentalHealthIndicators(text, enhancedEmotions, context);
-
-    const result = {
-      primary_emotion: enhancedEmotions[0].label,
-      confidence: enhancedEmotions[0].score,
-      all_emotions: enhancedEmotions.slice(0, 5), // Top 5 emotions
-      mental_health_indicators: mentalHealthIndicators,
-      context_analysis: context
+    return {
+      ...emotion,
+      score: enhancedScore
     };
+  });
 
-    console.log('Enhanced emotion analysis result:', result);
-    return result;
+  // Re-sort after enhancement
+  enhancedEmotions.sort((a, b) => b.score - a.score);
 
-  } catch (error) {
-    console.error('Error in HuggingFace emotion analysis:', error);
-    return advancedFallbackAnalysis(text);
-  }
+  // Calculate mental health indicators with context awareness
+  const mentalHealthIndicators = calculateAdvancedMentalHealthIndicators(text, enhancedEmotions, context);
+
+  const result = {
+    primary_emotion: enhancedEmotions[0].label,
+    confidence: enhancedEmotions[0].score,
+    all_emotions: enhancedEmotions.slice(0, 5), // Top 5 emotions
+    mental_health_indicators: mentalHealthIndicators,
+    context_analysis: context
+  };
+
+  console.log('✅ Enhanced emotion analysis result:', result);
+  return result;
 }
 
 serve(async (req: Request) => {
@@ -472,12 +417,12 @@ serve(async (req: Request) => {
       );
     }
 
-    console.log(`Analyzing emotion for text: "${text.substring(0, 100)}..."`);
+    console.log(`🧠 Analyzing emotion for text: "${text.substring(0, 100)}..."`);
 
-    // Perform advanced emotion analysis
+    // Perform advanced emotion analysis - NO FALLBACK
     const emotionAnalysis = await analyzeEmotionWithHuggingFace(text);
 
-    console.log('Final emotion analysis result:', emotionAnalysis);
+    console.log('✅ Final emotion analysis result:', emotionAnalysis);
 
     return new Response(
       JSON.stringify({
@@ -494,12 +439,12 @@ serve(async (req: Request) => {
     );
 
   } catch (error) {
-    console.error('Edge function error:', error);
+    console.error('❌ Edge function error:', error);
     
     return new Response(
       JSON.stringify({
         success: false,
-        error: 'Internal server error'
+        error: error.message || 'Internal server error'
       }),
       {
         status: 500,
