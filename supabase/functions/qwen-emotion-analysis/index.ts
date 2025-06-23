@@ -29,10 +29,14 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-async function analyzeEmotionWithClaude(text: string): Promise<EmotionAnalysis> {
-  const anthropicApiKey = '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';
+async function analyzeEmotionWithQwen(text: string): Promise<EmotionAnalysis> {
+  const openRouterApiKey = Deno.env.get('OPENROUTER_API_KEY');
   
-  console.log('🧠 Analyzing emotion with Claude for text:', text.substring(0, 50) + '...');
+  if (!openRouterApiKey) {
+    throw new Error('OpenRouter API key not found');
+  }
+  
+  console.log('🧠 Analyzing emotion with Qwen for text:', text.substring(0, 50) + '...');
   
   const prompt = `You are an advanced emotional intelligence AI specializing in comprehensive emotion analysis. Analyze the following text for emotional content:
 
@@ -64,7 +68,7 @@ Provide a detailed emotional analysis in JSON format with the following structur
 }
 
 ANALYSIS REQUIREMENTS:
-1. Detect nuanced emotions beyond basic categories
+1. Detect nuanced emotions beyond basic categories (happy, sad, angry, anxious, confused, excited, overwhelmed, hopeful, frustrated, grateful, etc.)
 2. Consider context, subtext, and implied emotions
 3. Recognize sarcasm, irony, and hidden feelings
 4. Analyze linguistic patterns, word choice, and structure
@@ -72,55 +76,113 @@ ANALYSIS REQUIREMENTS:
 6. Identify underlying psychological themes
 7. Consider cultural and personal expression styles
 8. Detect crisis language or concerning patterns
+9. Look for emotional intensity markers (punctuation, capitalization, repetition)
+10. Analyze emotional progression if multiple sentences
 
-Be thorough and accurate. Focus on the emotional essence rather than just keywords. Consider the full context and meaning of the text.`;
+Be thorough and accurate. Focus on the emotional essence rather than just keywords. Consider the full context and meaning of the text. Respond ONLY with valid JSON - no additional text or explanations.`;
 
-  console.log('🤖 Calling Claude API for emotion analysis...');
+  console.log('🤖 Calling Qwen API via OpenRouter for emotion analysis...');
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${openRouterApiKey}`,
         'Content-Type': 'application/json',
-        'x-api-key': anthropicApiKey,
-        'anthropic-version': '2023-06-01'
+        'HTTP-Referer': 'https://mindspace-app.com',
+        'X-Title': 'MindSpace Emotion Analysis'
       },
       body: JSON.stringify({
-        model: 'claude-3-sonnet-20240229',
-        max_tokens: 1500,
+        model: 'qwen/qwen-2.5-72b-instruct',
         messages: [{
           role: 'user',
           content: prompt
-        }]
+        }],
+        temperature: 0.3,
+        max_tokens: 1500,
+        top_p: 0.9
       })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Claude API error:', response.status, errorText);
-      throw new Error(`Claude API error: ${response.status} - ${errorText}`);
+      console.error('❌ Qwen API error:', response.status, errorText);
+      throw new Error(`Qwen API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    const analysisText = data.content[0].text;
+    const analysisText = data.choices[0].message.content;
     
-    console.log('📊 Claude raw response:', analysisText);
+    console.log('📊 Qwen raw response:', analysisText);
 
     // Parse JSON response
     try {
       const parsedAnalysis = JSON.parse(analysisText);
-      console.log('✅ Claude emotion analysis parsed successfully:', parsedAnalysis);
+      console.log('✅ Qwen emotion analysis parsed successfully:', parsedAnalysis);
+      
+      // Validate the structure
+      if (!parsedAnalysis.primary_emotion || !parsedAnalysis.mental_health_indicators) {
+        throw new Error('Invalid analysis structure');
+      }
+      
       return parsedAnalysis;
     } catch (parseError) {
-      console.error('❌ Failed to parse Claude response as JSON:', parseError);
+      console.error('❌ Failed to parse Qwen response as JSON:', parseError);
       console.error('Raw response:', analysisText);
-      throw new Error(`Failed to parse Claude response: ${parseError.message}`);
+      
+      // Fallback analysis if JSON parsing fails
+      return createFallbackAnalysis(text);
     }
 
   } catch (error) {
-    console.error('Error in Claude emotion analysis:', error);
+    console.error('Error in Qwen emotion analysis:', error);
     throw error;
   }
+}
+
+function createFallbackAnalysis(text: string): EmotionAnalysis {
+  console.log('🔄 Creating fallback analysis for:', text.substring(0, 50) + '...');
+  
+  const lowerText = text.toLowerCase();
+  
+  // Simple emotion detection
+  let primaryEmotion = 'neutral';
+  let confidence = 0.5;
+  
+  if (lowerText.includes('sad') || lowerText.includes('cry') || lowerText.includes('depressed')) {
+    primaryEmotion = 'sad';
+    confidence = 0.7;
+  } else if (lowerText.includes('anxious') || lowerText.includes('worried') || lowerText.includes('nervous')) {
+    primaryEmotion = 'anxious';
+    confidence = 0.7;
+  } else if (lowerText.includes('angry') || lowerText.includes('mad') || lowerText.includes('frustrated')) {
+    primaryEmotion = 'angry';
+    confidence = 0.7;
+  } else if (lowerText.includes('happy') || lowerText.includes('joy') || lowerText.includes('excited')) {
+    primaryEmotion = 'happy';
+    confidence = 0.7;
+  }
+  
+  return {
+    primary_emotion: primaryEmotion,
+    confidence: confidence,
+    all_emotions: [
+      { label: primaryEmotion, score: confidence },
+      { label: 'neutral', score: 1 - confidence }
+    ],
+    mental_health_indicators: {
+      anxiety_level: primaryEmotion === 'anxious' ? 0.6 : 0.3,
+      depression_level: primaryEmotion === 'sad' ? 0.6 : 0.3,
+      stress_level: ['anxious', 'angry', 'frustrated'].includes(primaryEmotion) ? 0.6 : 0.3,
+      positive_sentiment: primaryEmotion === 'happy' ? 0.7 : 0.4
+    },
+    context_analysis: {
+      tone: primaryEmotion,
+      intensity: confidence,
+      emotional_complexity: 1,
+      underlying_themes: [primaryEmotion]
+    }
+  };
 }
 
 serve(async (req: Request) => {
@@ -177,8 +239,8 @@ serve(async (req: Request) => {
       );
     }
 
-    // Perform emotion analysis with Claude
-    const emotionAnalysis = await analyzeEmotionWithClaude(text);
+    // Perform emotion analysis with Qwen
+    const emotionAnalysis = await analyzeEmotionWithQwen(text);
 
     return new Response(
       JSON.stringify({

@@ -32,12 +32,12 @@ class EmotionService {
   }
 
   async analyzeEmotion(text: string): Promise<EmotionAnalysis> {
-    console.log('🧠 Starting Claude emotion analysis via edge function...');
+    console.log('🧠 Starting Qwen emotion analysis via edge function...');
     console.log('📝 Analyzing text:', text.substring(0, 50) + '...');
     
     try {
-      // Call the Supabase Edge Function that handles Claude API
-      const response = await fetch(`${this.supabaseUrl}/functions/v1/claude-emotion-analysis`, {
+      // Call the Supabase Edge Function that handles Qwen API
+      const response = await fetch(`${this.supabaseUrl}/functions/v1/qwen-emotion-analysis`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -59,7 +59,7 @@ class EmotionService {
         throw new Error(`Invalid response: ${result.error || 'No data returned'}`);
       }
 
-      console.log('✅ Claude emotion analysis complete:', result.data);
+      console.log('✅ Qwen emotion analysis complete:', result.data);
       return result.data;
 
     } catch (error) {

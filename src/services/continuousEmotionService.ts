@@ -92,8 +92,8 @@ class ContinuousEmotionService {
       this.conversationContexts.set(userId, context);
     }
 
-    // Analyze current message with Claude via edge function
-    const currentAnalysis = await this.analyzeWithClaude(message, context);
+    // Analyze current message with Qwen via edge function
+    const currentAnalysis = await this.analyzeWithQwen(message, context);
 
     // Update conversation context
     this.updateContext(context, message, timestamp, currentAnalysis, responseDelay);
@@ -126,7 +126,7 @@ class ContinuousEmotionService {
     };
   }
 
-  private async analyzeWithClaude(message: string, context: ConversationContext): Promise<any> {
+  private async analyzeWithQwen(message: string, context: ConversationContext): Promise<any> {
     const conversationHistory = context.messageHistory.slice(-5).map(msg => msg.content).join('\n');
     
     const prompt = `You are an advanced emotional intelligence AI specializing in continuous psychological assessment. Analyze the following message in context:
@@ -176,10 +176,10 @@ ANALYSIS REQUIREMENTS:
 
 Respond in JSON format with detailed analysis covering all aspects above. Be thorough and nuanced in your assessment.`;
 
-    console.log('🤖 Calling Claude API via edge function for advanced analysis...');
+    console.log('🤖 Calling Qwen API via edge function for advanced analysis...');
 
     try {
-      const response = await fetch(`${this.supabaseUrl}/functions/v1/claude-emotion-analysis`, {
+      const response = await fetch(`${this.supabaseUrl}/functions/v1/qwen-emotion-analysis`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -201,7 +201,7 @@ Respond in JSON format with detailed analysis covering all aspects above. Be tho
         throw new Error(`Invalid response: ${result.error || 'No data returned'}`);
       }
 
-      console.log('✅ Claude analysis complete:', result.data);
+      console.log('✅ Qwen analysis complete:', result.data);
       return result.data;
 
     } catch (error) {
@@ -264,9 +264,9 @@ Respond in JSON format with detailed analysis covering all aspects above. Be tho
 
     return {
       realTimeState: {
-        primaryEmotion: currentAnalysis.emotionalState?.primaryEmotion || 'neutral',
-        confidence: currentAnalysis.emotionalState?.confidence || 0.5,
-        intensity: currentAnalysis.emotionalState?.intensity || 0.5,
+        primaryEmotion: currentAnalysis.primary_emotion || 'neutral',
+        confidence: currentAnalysis.confidence || 0.5,
+        intensity: currentAnalysis.context_analysis?.intensity || 0.5,
         stability: currentAnalysis.emotionalState?.stability || 0.5
       },
       contextualFactors: {
@@ -436,8 +436,9 @@ Respond in JSON format with detailed analysis covering all aspects above. Be tho
     let riskScore = 0;
 
     // Check current emotional state
-    if (currentAnalysis.emotionalState) {
-      const { primaryEmotion, intensity } = currentAnalysis.emotionalState;
+    if (currentAnalysis.primary_emotion) {
+      const primaryEmotion = currentAnalysis.primary_emotion;
+      const intensity = currentAnalysis.context_analysis?.intensity || 0.5;
       
       if (['hopeless', 'suicidal', 'desperate'].includes(primaryEmotion)) {
         riskScore += 0.8;
@@ -515,11 +516,11 @@ Respond in JSON format with detailed analysis covering all aspects above. Be tho
       immediate.push('Provide crisis intervention resources');
       immediate.push('Encourage immediate professional help');
       immediate.push('Stay with user until help arrives if possible');
-    } else if (currentAnalysis.emotionalState?.primaryEmotion === 'anxious') {
+    } else if (currentAnalysis.primary_emotion === 'anxious') {
       immediate.push('Guide through breathing exercises');
       immediate.push('Offer grounding techniques');
       immediate.push('Provide reassurance and validation');
-    } else if (currentAnalysis.emotionalState?.primaryEmotion === 'sad') {
+    } else if (currentAnalysis.primary_emotion === 'sad') {
       immediate.push('Offer empathetic listening');
       immediate.push('Validate feelings');
       immediate.push('Suggest gentle activities');
@@ -548,8 +549,8 @@ Respond in JSON format with detailed analysis covering all aspects above. Be tho
 
   private updateUserBaseline(userId: string, context: ConversationContext, analysis: any): void {
     // Update typical emotions
-    if (analysis.emotionalState?.primaryEmotion) {
-      const emotion = analysis.emotionalState.primaryEmotion;
+    if (analysis.primary_emotion) {
+      const emotion = analysis.primary_emotion;
       if (!context.userBaseline.typicalEmotions.includes(emotion)) {
         context.userBaseline.typicalEmotions.push(emotion);
         // Keep only top 5 most common emotions
@@ -594,7 +595,7 @@ Respond in JSON format with detailed analysis covering all aspects above. Be tho
       sessionMetrics: context.sessionMetrics,
       recentHistory: context.messageHistory.slice(-10).map(msg => ({
         timestamp: msg.timestamp,
-        emotionSummary: msg.emotionAnalysis?.emotionalState,
+        emotionSummary: msg.emotionAnalysis?.primary_emotion,
         messageLength: msg.content.length,
         responseDelay: msg.responseDelay
       }))

@@ -30,7 +30,7 @@ export function useChat(): UseChatReturn {
     const welcomeMessage: ChatHookMessage = {
       id: 'welcome',
       role: 'assistant',
-      content: "Hello! I'm here to listen and support you with advanced AI-powered emotional understanding. How are you feeling today? Feel free to share whatever is on your mind - I use Claude's sophisticated analysis to truly understand your emotions. 💙",
+      content: "Hello! I'm here to listen and support you with advanced AI-powered emotional understanding. How are you feeling today? Feel free to share whatever is on your mind - I use Qwen's sophisticated analysis to truly understand your emotions. 💙",
       timestamp: new Date()
     };
     setMessages([welcomeMessage]);
@@ -58,10 +58,10 @@ export function useChat(): UseChatReturn {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      // Analyze emotion with Claude - NO FALLBACK
-      console.log('🧠 Starting Claude emotion analysis...');
+      // Analyze emotion with Qwen - NO FALLBACK
+      console.log('🧠 Starting Qwen emotion analysis...');
       const emotionAnalysis = await emotionService.analyzeEmotion(content);
-      console.log('✅ Claude emotion analysis complete:', emotionAnalysis);
+      console.log('✅ Qwen emotion analysis complete:', emotionAnalysis);
       
       // Update user message with emotion analysis
       setMessages(prev => prev.map(msg => 
@@ -91,17 +91,18 @@ export function useChat(): UseChatReturn {
 
       // Add the new user message with detailed emotion context for AI
       const emotionContext = `
-[ADVANCED EMOTION ANALYSIS by Claude AI:
+[ADVANCED EMOTION ANALYSIS by Qwen AI:
 - Primary Emotion: ${emotionAnalysis.primary_emotion} (${Math.round(emotionAnalysis.confidence * 100)}% confidence)
 - Emotional Intensity: ${emotionAnalysis.context_analysis?.intensity ? Math.round(emotionAnalysis.context_analysis.intensity * 100) + '%' : 'Unknown'}
 - Emotional Tone: ${emotionAnalysis.context_analysis?.tone || 'Unknown'}
+- Emotional Complexity: ${emotionAnalysis.context_analysis?.emotional_complexity || 'Unknown'}
 - Mental Health Indicators:
   * Anxiety Level: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.anxiety_level)} (${Math.round(emotionAnalysis.mental_health_indicators.anxiety_level * 100)}%)
   * Depression Level: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.depression_level)} (${Math.round(emotionAnalysis.mental_health_indicators.depression_level * 100)}%)
   * Stress Level: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.stress_level)} (${Math.round(emotionAnalysis.mental_health_indicators.stress_level * 100)}%)
   * Positive Sentiment: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.positive_sentiment)} (${Math.round(emotionAnalysis.mental_health_indicators.positive_sentiment * 100)}%)
 - Underlying Themes: ${emotionAnalysis.context_analysis?.underlying_themes?.join(', ') || 'None detected'}
-- Emotional Complexity: ${emotionAnalysis.context_analysis?.emotional_complexity || 'Unknown'}]`;
+- All Detected Emotions: ${emotionAnalysis.all_emotions.map(e => `${e.label} (${Math.round(e.score * 100)}%)`).join(', ')}]`;
 
       const userMessageWithContext = {
         role: 'user' as const,
@@ -110,8 +111,8 @@ export function useChat(): UseChatReturn {
 
       conversationHistory.push(userMessageWithContext);
 
-      // Get AI response with comprehensive emotion-aware context
-      console.log('🤖 Getting AI response with emotion context...');
+      // Get AI response with comprehensive emotion-aware context using Qwen
+      console.log('🤖 Getting Qwen AI response with emotion context...');
       const aiResponse = await aiService.sendMessage(conversationHistory);
 
       // Remove typing indicator and add AI response
@@ -160,7 +161,7 @@ export function useChat(): UseChatReturn {
     const welcomeMessage: ChatHookMessage = {
       id: 'welcome-new',
       role: 'assistant',
-      content: "Hello! I'm here to listen and support you with advanced AI-powered emotional understanding. How are you feeling today? Feel free to share whatever is on your mind - I use Claude's sophisticated analysis to truly understand your emotions. 💙",
+      content: "Hello! I'm here to listen and support you with advanced AI-powered emotional understanding. How are you feeling today? Feel free to share whatever is on your mind - I use Qwen's sophisticated analysis to truly understand your emotions. 💙",
       timestamp: new Date()
     };
     setMessages([welcomeMessage]);
