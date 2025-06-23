@@ -65,12 +65,15 @@ interface ComprehensiveEmotionalAssessment {
 }
 
 class ContinuousEmotionService {
-  private anthropicApiKey: string;
+  private supabaseUrl: string;
   private conversationContexts: Map<string, ConversationContext> = new Map();
   private userProfiles: Map<string, any> = new Map();
 
   constructor() {
-    this.anthropicApiKey = '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';
+    this.supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    if (!this.supabaseUrl) {
+      throw new Error('Supabase URL is not configured');
+    }
   }
 
   async analyzeEmotionalContext(
@@ -89,7 +92,7 @@ class ContinuousEmotionService {
       this.conversationContexts.set(userId, context);
     }
 
-    // Analyze current message with Claude - NO FALLBACK
+    // Analyze current message with Claude via edge function
     const currentAnalysis = await this.analyzeWithClaude(message, context);
 
     // Update conversation context
@@ -173,45 +176,37 @@ ANALYSIS REQUIREMENTS:
 
 Respond in JSON format with detailed analysis covering all aspects above. Be thorough and nuanced in your assessment.`;
 
-    console.log('🤖 Calling Claude API for advanced analysis...');
+    console.log('🤖 Calling Claude API via edge function for advanced analysis...');
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.anthropicApiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-sonnet-20240229',
-        max_tokens: 2000,
-        messages: [{
-          role: 'user',
-          content: prompt
-        }]
-      })
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Claude API error:', response.status, errorText);
-      throw new Error(`Claude API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    const analysisText = data.content[0].text;
-    
-    console.log('📊 Claude raw response:', analysisText);
-
-    // Parse JSON response - NO FALLBACK
     try {
-      const parsedAnalysis = JSON.parse(analysisText);
-      console.log('✅ Claude analysis parsed successfully:', parsedAnalysis);
-      return parsedAnalysis;
-    } catch (parseError) {
-      console.error('❌ Failed to parse Claude response as JSON:', parseError);
-      console.error('Raw response:', analysisText);
-      throw new Error(`Failed to parse Claude response: ${parseError.message}`);
+      const response = await fetch(`${this.supabaseUrl}/functions/v1/claude-emotion-analysis`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+        },
+        body: JSON.stringify({ text: prompt })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ Edge function error:', response.status, errorData);
+        throw new Error(`Edge function error: ${response.status} - ${errorData.error || 'Unknown error'}`);
+      }
+
+      const result = await response.json();
+      
+      if (!result.success || !result.data) {
+        console.error('❌ Invalid response from edge function:', result);
+        throw new Error(`Invalid response: ${result.error || 'No data returned'}`);
+      }
+
+      console.log('✅ Claude analysis complete:', result.data);
+      return result.data;
+
+    } catch (error) {
+      console.error('❌ Error in continuous analysis:', error);
+      throw new Error(`Continuous analysis failed: ${error.message}`);
     }
   }
 
