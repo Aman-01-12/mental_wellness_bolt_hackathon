@@ -30,7 +30,7 @@ export function useChat(): UseChatReturn {
     const welcomeMessage: ChatHookMessage = {
       id: 'welcome',
       role: 'assistant',
-      content: "Hello! I'm here to listen and support you. How are you feeling today? Feel free to share whatever is on your mind - I'm here to help. 💙",
+      content: "Hello! I'm here to listen and support you with advanced AI-powered emotional understanding. How are you feeling today? Feel free to share whatever is on your mind - I use Claude's sophisticated analysis to truly understand your emotions. 💙",
       timestamp: new Date()
     };
     setMessages([welcomeMessage]);
@@ -58,8 +58,10 @@ export function useChat(): UseChatReturn {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      // Analyze emotion of user message
+      // Analyze emotion with Claude - NO FALLBACK
+      console.log('🧠 Starting Claude emotion analysis...');
       const emotionAnalysis = await emotionService.analyzeEmotion(content);
+      console.log('✅ Claude emotion analysis complete:', emotionAnalysis);
       
       // Update user message with emotion analysis
       setMessages(prev => prev.map(msg => 
@@ -87,15 +89,29 @@ export function useChat(): UseChatReturn {
           content: msg.content
         }));
 
-      // Add the new user message with emotion context for AI
+      // Add the new user message with detailed emotion context for AI
+      const emotionContext = `
+[ADVANCED EMOTION ANALYSIS by Claude AI:
+- Primary Emotion: ${emotionAnalysis.primary_emotion} (${Math.round(emotionAnalysis.confidence * 100)}% confidence)
+- Emotional Intensity: ${emotionAnalysis.context_analysis?.intensity ? Math.round(emotionAnalysis.context_analysis.intensity * 100) + '%' : 'Unknown'}
+- Emotional Tone: ${emotionAnalysis.context_analysis?.tone || 'Unknown'}
+- Mental Health Indicators:
+  * Anxiety Level: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.anxiety_level)} (${Math.round(emotionAnalysis.mental_health_indicators.anxiety_level * 100)}%)
+  * Depression Level: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.depression_level)} (${Math.round(emotionAnalysis.mental_health_indicators.depression_level * 100)}%)
+  * Stress Level: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.stress_level)} (${Math.round(emotionAnalysis.mental_health_indicators.stress_level * 100)}%)
+  * Positive Sentiment: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.positive_sentiment)} (${Math.round(emotionAnalysis.mental_health_indicators.positive_sentiment * 100)}%)
+- Underlying Themes: ${emotionAnalysis.context_analysis?.underlying_themes?.join(', ') || 'None detected'}
+- Emotional Complexity: ${emotionAnalysis.context_analysis?.emotional_complexity || 'Unknown'}]`;
+
       const userMessageWithContext = {
         role: 'user' as const,
-        content: `${content.trim()}\n\n[Emotion Analysis: Primary emotion detected as "${emotionAnalysis.primary_emotion}" with ${Math.round(emotionAnalysis.confidence * 100)}% confidence. Mental health indicators - Anxiety: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.anxiety_level)}, Depression: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.depression_level)}, Stress: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.stress_level)}, Positive sentiment: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.positive_sentiment)}]`
+        content: `${content.trim()}\n\n${emotionContext}`
       };
 
       conversationHistory.push(userMessageWithContext);
 
-      // Get AI response with emotion-aware context
+      // Get AI response with comprehensive emotion-aware context
+      console.log('🤖 Getting AI response with emotion context...');
       const aiResponse = await aiService.sendMessage(conversationHistory);
 
       // Remove typing indicator and add AI response
@@ -123,7 +139,7 @@ export function useChat(): UseChatReturn {
       const errorChatMessage: ChatHookMessage = {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: "I'm sorry, I'm having trouble responding right now. Please try again in a moment. If the problem persists, you might want to check your internet connection.",
+        content: "I'm sorry, I'm having trouble with the emotion analysis or response generation right now. This might be due to API connectivity issues. Please try again in a moment.",
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorChatMessage]);
@@ -144,7 +160,7 @@ export function useChat(): UseChatReturn {
     const welcomeMessage: ChatHookMessage = {
       id: 'welcome-new',
       role: 'assistant',
-      content: "Hello! I'm here to listen and support you. How are you feeling today? Feel free to share whatever is on your mind - I'm here to help. 💙",
+      content: "Hello! I'm here to listen and support you with advanced AI-powered emotional understanding. How are you feeling today? Feel free to share whatever is on your mind - I use Claude's sophisticated analysis to truly understand your emotions. 💙",
       timestamp: new Date()
     };
     setMessages([welcomeMessage]);
