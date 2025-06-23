@@ -30,7 +30,7 @@ const corsHeaders = {
 };
 
 async function analyzeEmotionWithClaude(text: string): Promise<EmotionAnalysis> {
-  const anthropicApiKey = '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';
+  const anthropicApiKey = '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';
   
   console.log('🧠 Analyzing emotion with Claude for text:', text.substring(0, 50) + '...');
   
