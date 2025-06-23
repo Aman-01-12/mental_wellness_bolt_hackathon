@@ -1,14 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, ArrowLeft, Send, RotateCcw, AlertCircle, Heart, Brain, TrendingUp } from 'lucide-react';
+import { Bot, ArrowLeft, Send, RotateCcw, AlertCircle, Heart, Brain, TrendingUp, Eye, EyeOff } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { useChat } from '../../hooks/useChat';
 import { useEmotionalAssessment } from '../../hooks/useEmotionalAssessment';
+import { useContinuousEmotionAnalysis } from '../../hooks/useContinuousEmotionAnalysis';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { emotionService } from '../../services/emotionService';
 import { EmotionInsights } from './EmotionInsights';
 import { EmotionAssessmentModal } from './EmotionAssessmentModal';
+import { ContinuousEmotionDashboard } from './ContinuousEmotionDashboard';
 
 export function ChatInterface() {
   const navigate = useNavigate();
@@ -22,8 +24,19 @@ export function ChatInterface() {
     resetAssessmentHistory 
   } = useEmotionalAssessment();
   
+  const {
+    currentAssessment: continuousAssessment,
+    isAnalyzing,
+    analyzeMessage,
+    getEmotionalHistory,
+    resetAnalysis,
+    exportData
+  } = useContinuousEmotionAnalysis();
+  
   const [inputValue, setInputValue] = useState('');
   const [showInsights, setShowInsights] = useState(false);
+  const [showContinuousAnalysis, setShowContinuousAnalysis] = useState(false);
+  const [lastMessageTime, setLastMessageTime] = useState<Date | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -42,14 +55,29 @@ export function ChatInterface() {
     if (!inputValue.trim() || isLoading) return;
 
     const message = inputValue.trim();
+    const currentTime = new Date();
+    
+    // Calculate response delay
+    const responseDelay = lastMessageTime ? currentTime.getTime() - lastMessageTime.getTime() : undefined;
+    
     setInputValue('');
+    setLastMessageTime(currentTime);
     
-    // Send message and get emotion analysis
-    const emotionAnalysis = await sendMessage(message);
-    
-    // Trigger emotional assessment if needed
-    if (emotionAnalysis) {
-      triggerAssessment(emotionAnalysis);
+    try {
+      // Send message and get basic emotion analysis
+      const emotionAnalysis = await sendMessage(message);
+      
+      // Perform continuous emotion analysis
+      if (showContinuousAnalysis) {
+        await analyzeMessage(message, responseDelay);
+      }
+      
+      // Trigger emotional assessment if needed
+      if (emotionAnalysis) {
+        triggerAssessment(emotionAnalysis);
+      }
+    } catch (error) {
+      console.error('Error in message handling:', error);
     }
   };
 
@@ -63,15 +91,15 @@ export function ChatInterface() {
   const handleClearChat = () => {
     clearChat();
     resetAssessmentHistory();
+    resetAnalysis();
+    setLastMessageTime(null);
   };
 
   const handleContinueWithAI = () => {
-    // User chose to continue with AI - just dismiss modal
     dismissAssessment();
   };
 
   const handleFindPeerSupport = () => {
-    // User chose peer support - navigate to peer matching
     dismissAssessment();
     navigate('/peer-matching');
   };
@@ -85,7 +113,7 @@ export function ChatInterface() {
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 flex flex-col">
       <Navigation />
       
-      <div className="flex-1 max-w-6xl mx-auto w-full px-4 py-6 flex gap-6">
+      <div className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 flex gap-6">
         {/* Main Chat Area */}
         <div className="flex-1 flex flex-col">
           {/* Header */}
@@ -109,13 +137,25 @@ export function ChatInterface() {
                   <div>
                     <h1 className="text-xl font-semibold text-gray-900">AI Companion</h1>
                     <p className="text-sm text-gray-500">
-                      {isTyping ? 'Typing...' : 'Powered by Qwen2.5 72B • Emotion-aware support'}
+                      {isTyping ? 'Typing...' : isAnalyzing ? 'Analyzing emotions...' : 'Powered by Claude Sonnet • Advanced emotion monitoring'}
                     </p>
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center space-x-2">
+                <button
+                  onClick={() => setShowContinuousAnalysis(!showContinuousAnalysis)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${
+                    showContinuousAnalysis 
+                      ? 'bg-purple-100 text-purple-700' 
+                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                  }`}
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  <span className="text-sm font-medium">Continuous Analysis</span>
+                </button>
+
                 <button
                   onClick={() => setShowInsights(!showInsights)}
                   className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${
@@ -125,7 +165,7 @@ export function ChatInterface() {
                   }`}
                 >
                   <Brain className="w-4 h-4" />
-                  <span className="text-sm font-medium">Insights</span>
+                  <span className="text-sm font-medium">Basic Insights</span>
                 </button>
                 
                 <button
@@ -227,7 +267,7 @@ export function ChatInterface() {
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Share what's on your mind... I'll analyze your emotions to provide better support."
+                    placeholder="Share what's on your mind... I'll provide advanced emotional analysis and support."
                     className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors resize-none"
                     rows={1}
                     style={{
@@ -247,10 +287,10 @@ export function ChatInterface() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   type="submit"
-                  disabled={!inputValue.trim() || isLoading}
+                  disabled={!inputValue.trim() || isLoading || isAnalyzing}
                   className="px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-2xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
-                  {isLoading ? (
+                  {isLoading || isAnalyzing ? (
                     <LoadingSpinner size="small" color="white" />
                   ) : (
                     <Send className="w-4 h-4" />
@@ -260,7 +300,7 @@ export function ChatInterface() {
               </form>
               
               <p className="text-xs text-gray-500 mt-3 text-center">
-                Press Enter to send, Shift+Enter for new line. Your emotions are continuously analyzed for personalized support.
+                Press Enter to send, Shift+Enter for new line. Advanced AI monitors your emotional patterns continuously.
               </p>
             </div>
           </div>
@@ -284,16 +324,28 @@ export function ChatInterface() {
           </motion.div>
         </div>
 
-        {/* Emotion Insights Sidebar */}
+        {/* Sidebar for Analysis */}
         <AnimatePresence>
-          {showInsights && latestUserMessage?.emotionAnalysis && (
+          {(showInsights || showContinuousAnalysis) && (
             <motion.div
               initial={{ opacity: 0, x: 300 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 300 }}
-              className="w-80 flex-shrink-0"
+              className="w-96 flex-shrink-0 space-y-6"
             >
-              <EmotionInsights emotionAnalysis={latestUserMessage.emotionAnalysis} />
+              {/* Continuous Analysis Dashboard */}
+              {showContinuousAnalysis && continuousAssessment && (
+                <ContinuousEmotionDashboard
+                  assessment={continuousAssessment}
+                  onExportData={exportData}
+                  onResetAnalysis={resetAnalysis}
+                />
+              )}
+
+              {/* Basic Emotion Insights */}
+              {showInsights && latestUserMessage?.emotionAnalysis && (
+                <EmotionInsights emotionAnalysis={latestUserMessage.emotionAnalysis} />
+              )}
             </motion.div>
           )}
         </AnimatePresence>
