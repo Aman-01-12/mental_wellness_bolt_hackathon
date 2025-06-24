@@ -4,6 +4,7 @@ import { AlertTriangle, Users, Bot, X, Heart, Brain } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { emotionService, type EmotionAnalysis } from '../../services/emotionService';
 import { useAuthStore } from '../../store/authStore';
+import { supabase } from '../../lib/supabase';
 
 const NEED_TAGS = [
   'Listener', 'Advice', 'Gossip', 'Rant', 'Vent', 'Spill Tea', 'Just Vibe', 'Need Hype',
@@ -99,28 +100,92 @@ export function EmotionAssessmentModal({
     e.preventDefault();
     setLoading(true);
     setError(null);
+    
     try {
-      const res = await fetch('/functions/v1/create-ticket', {
+      console.log('🎫 Creating ticket from modal with data:', {
+        display_name: profile?.display_name || 'Anonymous',
+        age_range: profile?.age_range || null,
+        emotional_state: emotionAnalysis.primary_emotion,
+        need_tags: needTags,
+        details: details || null
+      });
+      
+      // Get the auth token from Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('No authentication session found. Please sign in again.');
+      }
+
+      // Call the Edge Function with proper URL
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL not configured');
+      }
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/create-ticket`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('sb-access-token')}`
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           display_name: profile?.display_name || 'Anonymous',
-          age_range: profile?.age_range || '',
+          age_range: profile?.age_range || null,
           emotional_state: emotionAnalysis.primary_emotion,
           need_tags: needTags,
-          details: details ? { extra: details } : null
+          details: details || null
         })
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Failed to create ticket');
+
+      console.log('📡 Response status:', response.status);
+
+      // Check if response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ HTTP Error:', response.status, errorText);
+        
+        // Try to parse as JSON, fallback to text
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || `HTTP ${response.status} error` };
+        }
+        
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      }
+
+      // Parse response
+      const responseText = await response.text();
+      console.log('📡 Raw response:', responseText);
+
+      if (!responseText) {
+        throw new Error('Empty response from server');
+      }
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ JSON Parse Error:', parseError);
+        console.error('❌ Response text:', responseText);
+        throw new Error('Invalid response format from server');
+      }
+
+      console.log('✅ Parsed result:', result);
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create ticket');
+      }
+
+      console.log('🎉 Ticket created successfully from modal:', result.ticket);
       setShowTicketModal(false);
       onClose();
       navigate('/active-flags');
+      
     } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+      console.error('❌ Error creating ticket from modal:', err);
+      setError(err.message || 'Something went wrong while creating your ticket');
     } finally {
       setLoading(false);
     }
