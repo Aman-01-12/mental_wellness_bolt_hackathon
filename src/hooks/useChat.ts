@@ -25,7 +25,26 @@ export function useChat(): UseChatReturn {
   const [error, setError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
+
+  // Update AI service with user profile when profile changes
+  useEffect(() => {
+    if (user?.id && profile) {
+      console.log('📋 Updating AI service with user profile context...');
+      aiService.updateUserProfile(user.id, {
+        age_range: profile.age_range,
+        gender: profile.gender,
+        personality_traits: profile.personality_traits,
+        work_status: profile.work_status,
+        work_style: profile.work_style,
+        relationship_status: profile.relationship_status,
+        communication_style: profile.communication_style,
+        support_type: profile.support_type,
+        availability: profile.availability,
+        mental_health_background: profile.mental_health_background
+      });
+    }
+  }, [user?.id, profile]);
 
   // Initialize with a gentle, natural welcome message
   useEffect(() => {
@@ -60,10 +79,10 @@ export function useChat(): UseChatReturn {
     setMessages(prev => [...prev, userMessage]);
 
     try {
-      // Analyze emotion with Qwen
-      console.log('🧠 Starting Qwen emotion analysis...');
-      const emotionAnalysis = await emotionService.analyzeEmotion(content);
-      console.log('✅ Qwen emotion analysis complete:', emotionAnalysis);
+      // Analyze emotion with enhanced context
+      console.log('🧠 Starting enhanced emotion analysis with user context...');
+      const emotionAnalysis = await emotionService.analyzeEmotion(content, user?.id);
+      console.log('✅ Enhanced emotion analysis complete:', emotionAnalysis);
       
       // Update user message with emotion analysis
       setMessages(prev => prev.map(msg => 
@@ -110,7 +129,13 @@ export function useChat(): UseChatReturn {
   * Depression Level: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.depression_level)} (${Math.round(emotionAnalysis.mental_health_indicators.depression_level * 100)}%)
   * Stress Level: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.stress_level)} (${Math.round(emotionAnalysis.mental_health_indicators.stress_level * 100)}%)
   * Positive Sentiment: ${emotionService.getMentalHealthLevelDescription(emotionAnalysis.mental_health_indicators.positive_sentiment)} (${Math.round(emotionAnalysis.mental_health_indicators.positive_sentiment * 100)}%)
-- Underlying Themes: ${emotionAnalysis.context_analysis?.underlying_themes?.join(', ') || 'None detected'}]`;
+- Underlying Themes: ${emotionAnalysis.context_analysis?.underlying_themes?.join(', ') || 'None detected'}
+- Fuzzy Indicators:
+  * Emotional Stability: ${Math.round((emotionAnalysis.fuzzy_indicators?.emotional_stability || 0.5) * 100)}%
+  * Communication Openness: ${Math.round((emotionAnalysis.fuzzy_indicators?.communication_openness || 0.5) * 100)}%
+  * Support Seeking: ${Math.round((emotionAnalysis.fuzzy_indicators?.support_seeking_behavior || 0.3) * 100)}%
+  * Coping Mechanisms: ${emotionAnalysis.fuzzy_indicators?.coping_mechanisms?.join(', ') || 'None detected'}
+  * Relationship to Emotions: ${emotionAnalysis.fuzzy_indicators?.relationship_to_emotions || 'Unknown'}]`;
 
       const userMessageWithContext = {
         role: 'user' as const,
@@ -119,8 +144,8 @@ export function useChat(): UseChatReturn {
 
       conversationHistory.push(userMessageWithContext);
 
-      // Get AI response with user ID for style adaptation
-      console.log('🤖 Getting gentle, adaptive Gemini AI response...');
+      // Get AI response with user ID for personalized adaptation
+      console.log('🤖 Getting personalized, gentle AI response with user context...');
       const aiResponse = await aiService.sendMessage(conversationHistory, user?.id);
 
       // Remove typing indicator and add AI response
@@ -168,6 +193,21 @@ export function useChat(): UseChatReturn {
     // Reset AI's understanding of user style for fresh start
     if (user?.id) {
       aiService.resetUserStyle(user.id);
+      // Re-update profile context after reset
+      if (profile) {
+        aiService.updateUserProfile(user.id, {
+          age_range: profile.age_range,
+          gender: profile.gender,
+          personality_traits: profile.personality_traits,
+          work_status: profile.work_status,
+          work_style: profile.work_style,
+          relationship_status: profile.relationship_status,
+          communication_style: profile.communication_style,
+          support_type: profile.support_type,
+          availability: profile.availability,
+          mental_health_background: profile.mental_health_background
+        });
+      }
     }
     
     // Add welcome message back with a fresh greeting
@@ -178,7 +218,7 @@ export function useChat(): UseChatReturn {
       timestamp: new Date()
     };
     setMessages([welcomeMessage]);
-  }, [user?.id]);
+  }, [user?.id, profile]);
 
   return {
     messages,

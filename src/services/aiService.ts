@@ -40,18 +40,43 @@ interface EmotionalContext {
   relationship_to_emotions: string;
 }
 
+interface UserProfileContext {
+  age_range?: string;
+  gender?: string;
+  personality_traits?: string[];
+  work_status?: string;
+  work_style?: string;
+  relationship_status?: string;
+  communication_style?: string;
+  support_type?: string;
+  availability?: string;
+  mental_health_background?: {
+    has_experience?: boolean;
+    overcome_challenges?: boolean;
+    comfortable_sharing?: boolean;
+    professional_help?: boolean;
+  };
+}
+
 class AIService {
   private apiKey: string;
   private baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
   private userStyles: Map<string, UserCommunicationStyle> = new Map();
   private conversationHistory: Map<string, ChatMessage[]> = new Map();
   private emotionalContexts: Map<string, EmotionalContext[]> = new Map();
+  private userProfiles: Map<string, UserProfileContext> = new Map();
 
   constructor() {
     this.apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!this.apiKey) {
       throw new Error('Google Gemini API key is not configured');
     }
+  }
+
+  // Method to update user profile context
+  updateUserProfile(userId: string, profile: UserProfileContext): void {
+    this.userProfiles.set(userId, profile);
+    console.log('📋 Updated user profile context for:', userId, profile);
   }
 
   private analyzeUserCommunicationStyle(messages: ChatMessage[], emotionalHistory: EmotionalContext[] = []): UserCommunicationStyle {
@@ -236,7 +261,8 @@ class AIService {
   private getAdaptiveSystemPrompt(
     userStyle: UserCommunicationStyle, 
     emotionalContext?: EmotionalContext,
-    conversationHistory?: ChatMessage[]
+    conversationHistory?: ChatMessage[],
+    userProfile?: UserProfileContext
   ): string {
     
     const isDistressed = emotionalContext && (
@@ -267,6 +293,45 @@ YOUR NATURAL RESPONSE STYLE:
 - Keep responses conversational and easy to read
 - Match their energy and communication style
 - Ask gentle follow-up questions when it feels right`;
+
+    const userProfileContext = userProfile ? `
+PERSONAL CONTEXT ABOUT THIS PERSON:
+${userProfile.age_range ? `- Age range: ${userProfile.age_range}` : ''}
+${userProfile.gender ? `- Gender: ${userProfile.gender}` : ''}
+${userProfile.personality_traits?.length ? `- Personality: ${userProfile.personality_traits.join(', ')}` : ''}
+${userProfile.work_status ? `- Work/life: ${userProfile.work_status}` : ''}
+${userProfile.work_style ? `- Work style: ${userProfile.work_style}` : ''}
+${userProfile.relationship_status ? `- Relationship status: ${userProfile.relationship_status}` : ''}
+${userProfile.communication_style ? `- Their communication style: ${userProfile.communication_style}` : ''}
+${userProfile.support_type ? `- How they like to help others: ${userProfile.support_type}` : ''}
+
+THEIR MENTAL HEALTH BACKGROUND:
+${userProfile.mental_health_background?.has_experience ? '- Has personal experience with mental health challenges' : ''}
+${userProfile.mental_health_background?.overcome_challenges ? '- Has overcome significant mental health challenges' : ''}
+${userProfile.mental_health_background?.comfortable_sharing ? '- Comfortable sharing their mental health journey' : ''}
+${userProfile.mental_health_background?.professional_help ? '- Has experience with professional mental health services' : ''}
+
+ADAPTATION BASED ON THEIR BACKGROUND:
+${userProfile.age_range?.includes('13-17') || userProfile.age_range?.includes('18-24') ? 
+  '- Use age-appropriate language and references they can relate to' : ''}
+${userProfile.personality_traits?.includes('Introvert') ? 
+  '- Respect their need for space and don\'t push too hard for details' : ''}
+${userProfile.personality_traits?.includes('Extrovert') ? 
+  '- They might appreciate more engaging, energetic responses' : ''}
+${userProfile.personality_traits?.includes('Shy') ? 
+  '- Be extra gentle and encouraging to help them open up' : ''}
+${userProfile.work_status === 'Student' ? 
+  '- Understand academic pressures, social dynamics, future uncertainty' : ''}
+${userProfile.work_status === 'Working Professional' ? 
+  '- Understand work stress, career pressures, work-life balance' : ''}
+${userProfile.relationship_status === 'Single' ? 
+  '- Be sensitive to potential loneliness or dating pressures' : ''}
+${userProfile.relationship_status === 'In a relationship' || userProfile.relationship_status === 'Married' ? 
+  '- Consider relationship dynamics and partner support systems' : ''}
+${userProfile.mental_health_background?.has_experience ? 
+  '- They understand mental health struggles personally - you can be more direct about mental health topics' : ''}
+${userProfile.mental_health_background?.overcome_challenges ? 
+  '- Acknowledge their strength and resilience when appropriate' : ''}` : '';
 
     const emotionalIntelligence = emotionalContext ? `
 CURRENT EMOTIONAL UNDERSTANDING:
@@ -350,7 +415,7 @@ WHAT TO AVOID:
 CRISIS AWARENESS:
 If they mention self-harm, suicide, or being in immediate danger, gently encourage professional help while staying present and supportive.`;
 
-    return `${basePersonality}\n${emotionalIntelligence}\n${styleAdaptation}\n${conversationApproach}`;
+    return `${basePersonality}\n${userProfileContext}\n${emotionalIntelligence}\n${styleAdaptation}\n${conversationApproach}`;
   }
 
   private updateUserStyle(userId: string, messages: ChatMessage[]): void {
@@ -436,7 +501,7 @@ If they mention self-harm, suicide, or being in immediate danger, gently encoura
     // Add system context as initial exchange
     formattedMessages.push({
       role: 'user',
-      parts: [{ text: `${systemPrompt}\n\nPlease respond as Alex, keeping responses natural, engaging, and adapted to this person's communication style and emotional needs. Focus on connecting first, then offering comfort.` }]
+      parts: [{ text: `${systemPrompt}\n\nPlease respond as Alex, keeping responses natural, engaging, and adapted to this person's communication style, emotional needs, and personal background. Focus on connecting first, then offering comfort.` }]
     });
     formattedMessages.push({
       role: 'model',
@@ -464,17 +529,18 @@ If they mention self-harm, suicide, or being in immediate danger, gently encoura
 
   async sendMessage(messages: ChatMessage[], userId?: string): Promise<string> {
     try {
-      console.log('🤖 Generating natural, engaging response with Gemini...');
+      console.log('🤖 Generating personalized, engaging response with Gemini...');
       
       // Update user communication style if we have a user ID
       if (userId) {
         this.updateUserStyle(userId, messages);
       }
       
-      // Get user style and emotional context
+      // Get user style, emotional context, and profile
       const userStyle = userId ? this.userStyles.get(userId) || this.getDefaultStyle() : this.getDefaultStyle();
       const emotionalContexts = userId ? this.emotionalContexts.get(userId) || [] : [];
       const currentEmotionalContext = emotionalContexts.length > 0 ? emotionalContexts[emotionalContexts.length - 1] : undefined;
+      const userProfile = userId ? this.userProfiles.get(userId) : undefined;
       
       // Extract and update emotional context from the latest message if available
       const latestMessage = messages[messages.length - 1];
@@ -486,16 +552,16 @@ If they mention self-harm, suicide, or being in immediate danger, gently encoura
           const updatedContexts = this.emotionalContexts.get(userId) || [];
           const updatedCurrentContext = updatedContexts.length > 0 ? updatedContexts[updatedContexts.length - 1] : undefined;
           
-          // Generate adaptive system prompt with updated context
-          const systemPrompt = this.getAdaptiveSystemPrompt(userStyle, updatedCurrentContext, messages);
+          // Generate adaptive system prompt with updated context and user profile
+          const systemPrompt = this.getAdaptiveSystemPrompt(userStyle, updatedCurrentContext, messages, userProfile);
           const formattedMessages = this.formatMessagesForGemini(messages, systemPrompt);
           
           return await this.callGeminiAPI(formattedMessages, userStyle, updatedCurrentContext);
         }
       }
       
-      // Generate adaptive system prompt
-      const systemPrompt = this.getAdaptiveSystemPrompt(userStyle, currentEmotionalContext, messages);
+      // Generate adaptive system prompt with user profile context
+      const systemPrompt = this.getAdaptiveSystemPrompt(userStyle, currentEmotionalContext, messages, userProfile);
       const formattedMessages = this.formatMessagesForGemini(messages, systemPrompt);
       
       return await this.callGeminiAPI(formattedMessages, userStyle, currentEmotionalContext);
@@ -552,7 +618,7 @@ If they mention self-harm, suicide, or being in immediate danger, gently encoura
       ]
     };
 
-    console.log('📤 Sending natural, engaging request to Gemini...', {
+    console.log('📤 Sending personalized request to Gemini...', {
       userStyle: {
         messageLength: userStyle.messageLength,
         formality: userStyle.formality,
@@ -584,7 +650,7 @@ If they mention self-harm, suicide, or being in immediate danger, gently encoura
     }
 
     const data: GeminiResponse = await response.json();
-    console.log('✅ Natural Gemini response received');
+    console.log('✅ Personalized Gemini response received');
     
     if (!data.candidates || data.candidates.length === 0) {
       throw new Error('No response from Gemini model');
@@ -596,7 +662,7 @@ If they mention self-harm, suicide, or being in immediate danger, gently encoura
     }
 
     const responseText = candidate.content.parts[0].text;
-    console.log('💬 Natural, engaging response generated:', responseText.substring(0, 100) + '...');
+    console.log('💬 Personalized, engaging response generated:', responseText.substring(0, 100) + '...');
     
     return responseText;
   }
@@ -649,8 +715,9 @@ If they mention self-harm, suicide, or being in immediate danger, gently encoura
     this.userStyles.delete(userId);
     this.conversationHistory.delete(userId);
     this.emotionalContexts.delete(userId);
+    // Keep user profile as it's more permanent
   }
 }
 
 export const aiService = new AIService();
-export type { ChatMessage, UserCommunicationStyle, EmotionalContext };
+export type { ChatMessage, UserCommunicationStyle, EmotionalContext, UserProfileContext };
