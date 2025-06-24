@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, ArrowLeft, Send, RotateCcw, AlertCircle, Heart, Brain, TrendingUp, Eye, EyeOff } from 'lucide-react';
+import { Bot, ArrowLeft, Send, RotateCcw, AlertCircle, Heart, Brain, TrendingUp, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { useChat } from '../../hooks/useChat';
@@ -131,13 +131,19 @@ export function ChatInterface() {
                   <ArrowLeft className="w-5 h-5" />
                 </Link>
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center relative">
                     <Bot className="w-6 h-6 text-white" />
+                    {isTyping && (
+                      <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    )}
                   </div>
                   <div>
-                    <h1 className="text-xl font-semibold text-gray-900">AI Companion</h1>
+                    <h1 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
+                      <span>Alex</span>
+                      <Sparkles className="w-4 h-4 text-primary-500" />
+                    </h1>
                     <p className="text-sm text-gray-500">
-                      {isTyping ? 'Typing...' : isAnalyzing ? 'Analyzing emotions...' : 'Powered by Claude Sonnet • Advanced emotion monitoring'}
+                      {isTyping ? 'Typing...' : isAnalyzing ? 'Understanding your emotions...' : 'Your adaptive AI companion • Powered by Gemini & Qwen'}
                     </p>
                   </div>
                 </div>
@@ -153,7 +159,7 @@ export function ChatInterface() {
                   }`}
                 >
                   <TrendingUp className="w-4 h-4" />
-                  <span className="text-sm font-medium">Continuous Analysis</span>
+                  <span className="text-sm font-medium">Deep Analysis</span>
                 </button>
 
                 <button
@@ -165,7 +171,7 @@ export function ChatInterface() {
                   }`}
                 >
                   <Brain className="w-4 h-4" />
-                  <span className="text-sm font-medium">Basic Insights</span>
+                  <span className="text-sm font-medium">Insights</span>
                 </button>
                 
                 <button
@@ -173,7 +179,7 @@ export function ChatInterface() {
                   className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
                 >
                   <RotateCcw className="w-4 h-4" />
-                  <span className="text-sm font-medium">New Chat</span>
+                  <span className="text-sm font-medium">Fresh Start</span>
                 </button>
               </div>
             </div>
@@ -197,7 +203,14 @@ export function ChatInterface() {
                           <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
                             <Bot className="w-4 h-4 text-white" />
                           </div>
-                          <span className="text-sm font-medium text-gray-700">AI Companion</span>
+                          <span className="text-sm font-medium text-gray-700">Alex</span>
+                          {message.isTyping && (
+                            <div className="flex space-x-1">
+                              <div className="w-2 h-2 bg-primary-400 rounded-full animate-bounce"></div>
+                              <div className="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                              <div className="w-2 h-2 bg-primary-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                            </div>
+                          )}
                         </div>
                       )}
                       
@@ -211,7 +224,7 @@ export function ChatInterface() {
                         {message.isTyping ? (
                           <div className="flex items-center space-x-2">
                             <LoadingSpinner size="small" />
-                            <span className="text-sm">Analyzing your emotions and crafting a response...</span>
+                            <span className="text-sm">Thinking about what you shared...</span>
                           </div>
                         ) : (
                           <p className="text-sm leading-relaxed whitespace-pre-wrap">
@@ -267,7 +280,7 @@ export function ChatInterface() {
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Share what's on your mind... I'll provide advanced emotional analysis and support."
+                    placeholder="Share what's on your mind... Alex adapts to how you communicate 💙"
                     className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors resize-none"
                     rows={1}
                     style={{
@@ -300,7 +313,7 @@ export function ChatInterface() {
               </form>
               
               <p className="text-xs text-gray-500 mt-3 text-center">
-                Press Enter to send, Shift+Enter for new line. Advanced AI monitors your emotional patterns continuously.
+                Press Enter to send, Shift+Enter for new line. Alex learns your communication style and adapts over time.
               </p>
             </div>
           </div>
