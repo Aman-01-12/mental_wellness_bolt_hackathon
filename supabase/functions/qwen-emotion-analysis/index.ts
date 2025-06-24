@@ -184,9 +184,18 @@ CRITICAL INSTRUCTIONS:
       throw new Error('Invalid response structure from Qwen API');
     }
     
-    const analysisText = data.choices[0].message.content;
+    let analysisText = data.choices[0].message.content;
     
     console.log('📊 Qwen human-like analysis response:', analysisText);
+
+    // Clean up markdown code blocks if present
+    if (analysisText.includes('```json')) {
+      analysisText = analysisText.replace(/```json\s*/g, '').replace(/```\s*$/g, '').trim();
+      console.log('🧹 Cleaned markdown formatting from response');
+    } else if (analysisText.includes('```')) {
+      analysisText = analysisText.replace(/```\s*/g, '').trim();
+      console.log('🧹 Cleaned generic markdown formatting from response');
+    }
 
     // Parse JSON response with enhanced error handling
     try {
@@ -236,7 +245,7 @@ CRITICAL INSTRUCTIONS:
       
     } catch (parseError) {
       console.error('❌ Failed to parse Qwen response as JSON:', parseError);
-      console.error('Raw response:', analysisText);
+      console.error('Raw response after cleanup:', analysisText);
       throw new Error(`Failed to parse Qwen response: ${parseError.message}`);
     }
 
