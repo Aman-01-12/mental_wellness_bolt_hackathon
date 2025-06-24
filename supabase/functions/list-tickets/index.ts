@@ -17,7 +17,10 @@ serve(async (req: Request) => {
   }
 
   if (req.method !== "GET") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: "Method not allowed" 
+    }), {
       status: 405,
       headers: { 
         "Content-Type": "application/json",
@@ -58,6 +61,7 @@ serve(async (req: Request) => {
     if (error) {
       console.error("Database error:", error);
       return new Response(JSON.stringify({ 
+        success: false,
         error: `Failed to fetch tickets: ${error.message}`,
         details: error.details || null
       }), {
@@ -85,6 +89,7 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error("Unexpected error in list-tickets function:", error);
     return new Response(JSON.stringify({ 
+      success: false,
       error: "Internal server error",
       message: error.message || "Unknown error occurred"
     }), {

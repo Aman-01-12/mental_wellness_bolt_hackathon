@@ -52,18 +52,23 @@ export function PeerMatching() {
     try {
       console.log('🎫 Creating ticket with data:', data);
       
-      // Get the auth token
-      const token = localStorage.getItem('sb-access-token');
-      if (!token) {
-        throw new Error('No authentication token found. Please sign in again.');
+      // Get the auth token from Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        throw new Error('No authentication session found. Please sign in again.');
       }
 
-      // Call the Edge Function
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-ticket`, {
+      // Call the Edge Function with proper URL
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
+        throw new Error('Supabase URL not configured');
+      }
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/create-ticket`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           display_name: data.display_name || 'Anonymous',

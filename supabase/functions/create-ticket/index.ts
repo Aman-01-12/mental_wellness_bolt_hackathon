@@ -17,7 +17,10 @@ serve(async (req: Request) => {
   }
 
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+    return new Response(JSON.stringify({ 
+      success: false,
+      error: "Method not allowed" 
+    }), {
       status: 405,
       headers: { 
         "Content-Type": "application/json",
@@ -39,7 +42,10 @@ serve(async (req: Request) => {
       requestData = await req.json();
     } catch (parseError) {
       console.error("Failed to parse request body:", parseError);
-      return new Response(JSON.stringify({ error: "Invalid JSON in request body" }), {
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: "Invalid JSON in request body" 
+      }), {
         status: 400,
         headers: { 
           "Content-Type": "application/json",
@@ -52,7 +58,10 @@ serve(async (req: Request) => {
 
     // Validate required fields
     if (!display_name || !emotional_state) {
-      return new Response(JSON.stringify({ error: "Missing required fields: display_name and emotional_state are required" }), {
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: "Missing required fields: display_name and emotional_state are required" 
+      }), {
         status: 400,
         headers: { 
           "Content-Type": "application/json",
@@ -63,7 +72,10 @@ serve(async (req: Request) => {
 
     // Validate need_tags is an array
     if (need_tags && !Array.isArray(need_tags)) {
-      return new Response(JSON.stringify({ error: "need_tags must be an array" }), {
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: "need_tags must be an array" 
+      }), {
         status: 400,
         headers: { 
           "Content-Type": "application/json",
@@ -76,7 +88,10 @@ serve(async (req: Request) => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       console.error("Authentication error:", userError);
-      return new Response(JSON.stringify({ error: "Unauthorized - please sign in again" }), {
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: "Unauthorized - please sign in again" 
+      }), {
         status: 401,
         headers: { 
           "Content-Type": "application/json",
@@ -111,6 +126,7 @@ serve(async (req: Request) => {
     if (error) {
       console.error("Database error:", error);
       return new Response(JSON.stringify({ 
+        success: false,
         error: `Failed to create ticket: ${error.message}`,
         details: error.details || null
       }), {
@@ -138,6 +154,7 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error("Unexpected error in create-ticket function:", error);
     return new Response(JSON.stringify({ 
+      success: false,
       error: "Internal server error",
       message: error.message || "Unknown error occurred"
     }), {
