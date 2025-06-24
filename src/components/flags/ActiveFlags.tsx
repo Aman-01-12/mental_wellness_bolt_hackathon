@@ -26,21 +26,73 @@ export function ActiveFlags() {
     const fetchTickets = async () => {
       setLoading(true);
       setError(null);
+      
       try {
-        const res = await fetch('/functions/v1/list-tickets', {
+        console.log('🎫 Fetching tickets...');
+        
+        // Get the auth token
+        const token = localStorage.getItem('sb-access-token');
+        if (!token) {
+          throw new Error('No authentication token found. Please sign in again.');
+        }
+
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/list-tickets`, {
+          method: 'GET',
           headers: {
-            'Authorization': `Bearer ${localStorage.getItem('sb-access-token')}`
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
           }
         });
-        const result = await res.json();
-        if (!res.ok) throw new Error(result.error || 'Failed to fetch tickets');
+
+        console.log('📡 Response status:', response.status);
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('❌ HTTP Error:', response.status, errorText);
+          
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText || `HTTP ${response.status} error` };
+          }
+          
+          throw new Error(errorData.error || `Server error: ${response.status}`);
+        }
+
+        const responseText = await response.text();
+        console.log('📡 Raw response:', responseText);
+
+        if (!responseText) {
+          throw new Error('Empty response from server');
+        }
+
+        let result;
+        try {
+          result = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('❌ JSON Parse Error:', parseError);
+          console.error('❌ Response text:', responseText);
+          throw new Error('Invalid response format from server');
+        }
+
+        console.log('✅ Parsed result:', result);
+
+        if (!result.success) {
+          throw new Error(result.error || 'Failed to fetch tickets');
+        }
+
         setTickets(result.tickets || []);
+        console.log('🎉 Tickets loaded:', result.tickets?.length || 0);
+        
       } catch (err: any) {
-        setError(err.message || 'Something went wrong');
+        console.error('❌ Error fetching tickets:', err);
+        setError(err.message || 'Something went wrong while fetching tickets');
       } finally {
         setLoading(false);
       }
     };
+
     fetchTickets();
   }, []);
 

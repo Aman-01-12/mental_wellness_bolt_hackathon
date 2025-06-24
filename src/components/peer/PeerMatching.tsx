@@ -48,27 +48,80 @@ export function PeerMatching() {
   const onSubmit = async (data: FormData) => {
     setLoading(true);
     setError(null);
+    
     try {
+      console.log('🎫 Creating ticket with data:', data);
+      
+      // Get the auth token
+      const token = localStorage.getItem('sb-access-token');
+      if (!token) {
+        throw new Error('No authentication token found. Please sign in again.');
+      }
+
       // Call the Edge Function
-      const res = await fetch('/functions/v1/create-ticket', {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-ticket`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('sb-access-token')}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          display_name: data.display_name,
-          age_range: data.age_range,
+          display_name: data.display_name || 'Anonymous',
+          age_range: data.age_range || null,
           emotional_state: data.emotional_state,
           need_tags: data.need_tags,
-          details: data.details ? { extra: data.details } : null
+          details: data.details || null
         })
       });
-      const result = await res.json();
-      if (!res.ok) throw new Error(result.error || 'Failed to create ticket');
+
+      console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
+
+      // Check if response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ HTTP Error:', response.status, errorText);
+        
+        // Try to parse as JSON, fallback to text
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText || `HTTP ${response.status} error` };
+        }
+        
+        throw new Error(errorData.error || `Server error: ${response.status}`);
+      }
+
+      // Parse response
+      const responseText = await response.text();
+      console.log('📡 Raw response:', responseText);
+
+      if (!responseText) {
+        throw new Error('Empty response from server');
+      }
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ JSON Parse Error:', parseError);
+        console.error('❌ Response text:', responseText);
+        throw new Error('Invalid response format from server');
+      }
+
+      console.log('✅ Parsed result:', result);
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create ticket');
+      }
+
+      console.log('🎉 Ticket created successfully:', result.ticket);
       navigate('/active-flags');
+      
     } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+      console.error('❌ Error creating ticket:', err);
+      setError(err.message || 'Something went wrong while creating your ticket');
     } finally {
       setLoading(false);
     }
@@ -184,7 +237,7 @@ export function PeerMatching() {
                   </button>
                 ))}
               </div>
-              {errors.need_tags && (
+              {selectedTags.length === 0 && (
                 <p className="mt-1 text-sm text-error-500">Please select at least one need</p>
               )}
             </div>
@@ -214,7 +267,7 @@ export function PeerMatching() {
             <button
               type="submit"
               className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white py-4 px-6 rounded-2xl font-medium hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-60"
-              disabled={loading}
+              disabled={loading || selectedTags.length === 0}
             >
               {loading ? 'Creating Ticket...' : 'Create Help Ticket'}
             </button>
