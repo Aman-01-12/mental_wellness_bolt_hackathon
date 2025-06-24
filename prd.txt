@@ -1,0 +1,364 @@
+## 1. Project Overview (Bolt AI–Friendly)
+
+**Project Name:** Mental and Emotional Wellbeing Web App
+
+**Purpose:**  
+Provide a safe, supportive, and anonymous platform where users can assess, understand, and improve their mental and emotional wellbeing.  
+The app brings people together to share their feelings, connect with others in similar situations, and receive support—either from empathetic peers or an AI companion—within a controlled, privacy-first environment.
+
+**Core Features:**
+- Anonymous, controlled peer-to-peer support and sharing.
+- **AI chatbot for empathetic, context-aware conversations and emotional state assessment.**
+- Peer matching system based on emotional state, needs, and preferences.
+- Real-time chat with both AI and human peers.
+- Privacy-first, user-controlled experience.
+- Gamification and achievements for engagement.
+
+**Key User Flows:**
+1. User signs up and completes onboarding/profile.
+2. User can chat with the AI companion or browse/join peer support conversations.
+3. After initial emotional assessment (and later, only after major/emergent events), user is offered to continue with AI or get matched with a peer.
+4. If matched, a flag/ticket is created and visible in the "Active Flags" section for others to connect.
+5. Real-time chat and feedback system for both AI and peer interactions.
+
+---
+
+## 2. Functional Requirements
+
+### 2.1 User Management & Onboarding
+
+**User Registration**
+- Users can register with email and password (Supabase Auth).
+- Email verification required.
+- Option for anonymous or pseudonymous display name.
+
+**Onboarding Flow**
+- Multi-step onboarding with progress indicator.
+- Collect the following data:
+  - Name (optional for anonymity)
+  - Age range (selectable, e.g., 13–17, 18–24, 25–34, etc.)
+  - Gender (optional)
+  - Personality traits (introvert, extrovert, ambivert, shy)
+  - Work/study status (student, working professional, unemployed, retired)
+  - Work style (remote, office, hybrid)
+  - Food habits (vegetarian, non-vegetarian, vegan, other)
+  - Sleep duration (average hours/night)
+  - Relationship status (single, in relationship, married, complicated)
+  - Communication style (casual, formal, empathetic, direct)
+  - Support type preferred (listener, advisor, companion)
+  - Availability (always, working hours, evenings, weekends)
+  - Mental health background (has experience, overcome challenges, comfortable sharing)
+- All fields are optional except age range and support type.
+- User can skip or edit any step.
+- Consent management for each data point.
+
+**Profile Management**
+- Users can view and edit their profile at any time.
+- Privacy settings allow granular control over what is shared during matching.
+
+**Gamification**
+- Profile completion progress bar.
+- Incentives for completing onboarding (e.g., badges, achievements).
+
+---
+
+### 2.2 AI Chatbot & Emotional Assessment
+
+**AI Chatbot Capabilities**
+- Provides empathetic, human-like conversation.
+- Maintains context using recent message history.
+- Adapts tone and style to user's personality and preferences.
+- Available 24/7 as an emotional companion.
+- **Powered by Qwen2.5 72B Instruct (OpenRouter API)** for all chatbot interactions.
+
+**Emotional State Assessment**
+- All emotional assessments are performed within the AI companion chat.
+- Continuously analyzes user input for emotional state using NLP and sentiment/emotion models.
+- Initial assessment triggers a pop-up:  
+  - Option 1: Continue with AI companion  
+  - Option 2: Get matched with a peer
+- If user continues with AI, further pop-ups are shown only after major/emergent assessments (e.g., suicidal tendencies, persistent anxiety/depression).
+
+**Assessment Details**
+- Detects and tags emotions (e.g., joy, sadness, anger, anxiety, stress, depression).
+- Identifies context and possible causes for emotional state.
+- Flags high-risk or crisis situations for intervention.
+
+**Conversation Memory**
+- Stores recent conversation turns for context-aware responses.
+- Respects user privacy and consent for data retention.
+
+**User Control**
+- User can end or pause conversation at any time.
+- User can request a new assessment or matching at any time.
+
+---
+
+### 2.3 Peer Matching & Ticketing System
+
+**Overview**
+- Enables users to connect with others in similar emotional states or needs, anonymously or semi-anonymously.
+- Matching is user-initiated and always opt-in.
+- Emotional assessments that trigger matching options are always conducted in the AI companion chat.
+
+**Matching Workflow**
+1. After initial AI assessment (or major/emergent event), user can choose to be matched with a peer.
+2. System creates a "flag" or "ticket" for the user, containing:
+   - Anonymous display name
+   - Age range
+   - Emotional state (as assessed by AI)
+   - User's need (e.g., listener, advice, gossip, rant, vent, "spill tea", "just vibe", "need hype", etc.)
+   - Any other details the user consents to share
+3. Ticket is posted in the "Active Flags" or "Calls for Help/Talk" section.
+4. Other users can browse active tickets and send a request to connect, optionally sharing their own basic details and needs.
+5. Original user receives the request and can accept or decline.
+6. If accepted, a real-time chat is initiated between the two users.
+
+**Active Flags Section**
+- Dedicated area where users can view all open tickets/flags.
+- Users can filter or search by emotional state, need, or other tags.
+
+**Privacy & Control**
+- All matching is opt-in and privacy-first.
+- Users control what information is shared on their ticket.
+- Users can withdraw their ticket or leave a conversation at any time.
+
+**Gen Z Optimization**
+- Needs and tags include both standard and trending Gen Z terminology for relatability and searchability.
+- System is modular; new needs/tags can be added easily.
+
+### 2.4 Real-Time Communication
+
+**Chat Infrastructure**
+- Real-time messaging between users and/or AI companion.
+- WebSocket-based implementation (e.g., Supabase Realtime or Socket.IO).
+- Supports one-on-one and group chats.
+- Typing indicators, read receipts, and message history.
+- Emoji reactions and basic rich text support.
+
+**Safety & Moderation**
+- Automated content filtering for harmful or inappropriate content.
+- Crisis detection triggers immediate intervention options.
+- User reporting and blocking features.
+- Moderation dashboard for community managers.
+- Privacy options: users can choose what info to reveal in chat.
+
+**User Control & Feedback**
+- Users can leave or end any chat at any time.
+- After each chat, users can select from a range of feedback options describing how they felt about the other person (e.g., good listener, supportive, fun, empathetic, etc.).
+- If a user receives 10 positive feedbacks in a specific category (e.g., listening), they earn a badge (e.g., 'Good Listener') that is displayed on their profile everywhere in the app.
+- Feedbacks and badges are used to encourage positive behavior and improve the platform experience.
+- Feedback system after each chat (rate experience, flag issues).
+
+---
+
+## 3. Non-Functional Requirements
+
+**Performance**
+- AI response time: <2 seconds.
+- Emotion analysis: <500ms.
+- Peer matching: <30 seconds.
+- Real-time messaging latency: <100ms.
+- Page load time: <3 seconds.
+
+**Scalability**
+- Support for 10,000+ concurrent users.
+- 100,000+ daily active users.
+- 1M+ messages per day.
+
+**Reliability & Availability**
+- 99.9% uptime target.
+- Automated daily backups.
+- Disaster recovery: RTO <4h, RPO <1h.
+
+**Security & Privacy**
+- All sensitive data encrypted at rest and in transit.
+- GDPR-compliant data export, deletion, and consent management.
+- Row-level security for user data.
+- Option for anonymous or pseudonymous usage.
+
+---
+
+## 4. Database Design (Supabase/PostgreSQL)
+
+**Users Table**
+- id (UUID, PK)
+- display_name (text)
+- age_range (text)
+- gender (text, optional)
+- personality_traits (text[])
+- work_status (text)
+- work_style (text)
+- food_habits (text)
+- sleep_duration (int)
+- relationship_status (text)
+- communication_style (text)
+- support_type (text)
+- availability (text)
+- mental_health_background (jsonb)
+- privacy_settings (jsonb)
+- created_at, updated_at (timestamps)
+
+**Tickets/Flags Table**
+- id (UUID, PK)
+- user_id (UUID, FK)
+- display_name (text)
+- age_range (text)
+- emotional_state (text)
+- need_tags (text[])
+- details (jsonb)
+- status (text: open/closed)
+- created_at, updated_at (timestamps)
+
+**Conversations Table**
+- id (UUID, PK)
+- participant_ids (UUID[])
+- type (text: ai, peer, group)
+- started_at, ended_at (timestamps)
+- status (text)
+
+**Messages Table**
+- id (UUID, PK)
+- conversation_id (UUID, FK)
+- sender_id (UUID)
+- content (text)
+- timestamp (timestamp)
+- message_type (text)
+- emotion_analysis (jsonb)
+
+---
+
+## 5. API Design
+
+**REST Endpoints**
+- POST /api/auth/register, /login, /logout
+- GET/PUT /api/users/profile
+- GET/PUT /api/users/privacy-settings
+- POST /api/ai/message (send message to AI)
+- POST /api/tickets (create flag/ticket)
+- GET /api/tickets (list active tickets)
+- POST /api/tickets/:id/request (request to connect)
+- POST /api/conversations (start chat)
+- GET /api/conversations/:id/messages
+- POST /api/messages (send message)
+- POST /api/feedback (submit chat feedback)
+
+**WebSocket Events**
+- join_room, send_message, typing_start, typing_stop
+- message_received, user_typing, user_stopped_typing
+- match_found, connection_status, crisis_alert
+
+---
+
+## 6. Machine Learning Pipeline
+
+**Emotion Analysis**
+- Use ensemble of NLP models (e.g., RoBERTa, BERT, VADER) for emotion and sentiment detection.
+- Tag messages with primary emotion, intensity, and risk level.
+- Crisis detection for suicide, self-harm, or severe distress.
+
+**[Model Details: AI Chatbot, Emotion & Sentiment Detection]**
+- **AI Chatbot:**
+  - Model/API: Qwen2.5 72B Instruct (OpenRouter API)
+  - Purpose: Generate human-like, empathetic, context-aware responses in chat.
+  - Integration: All user-AI chat interactions are handled by this model via API calls.
+
+- **Emotion Detection:**
+  - Model: [SamLowe/roberta-base-go_emotions](https://huggingface.co/SamLowe/roberta-base-go_emotions)
+  - Purpose: Multi-label emotion classification (27 emotions + neutral)
+  - Usage: Input user message, output a list of detected emotions (e.g., ["sadness", "disappointment"])
+  - Integration: Used to tag user messages for peer matching, analytics, and crisis detection.
+
+- **Textual Sentiment Analysis:**
+  - Dataset: [Kaggle: Sentiment Analysis for Mental Health](https://www.kaggle.com/datasets/suchintikasarkar/sentiment-analysis-for-mental-health/data)
+  - Purpose: Classify text as positive, negative, or neutral sentiment, specifically in a mental health context.
+  - Usage: Train a classifier (e.g., fine-tuned transformer or classical ML model) on this dataset. Input user message, output sentiment label (e.g., 'positive', 'negative', 'neutral').
+  - Integration: Used alongside emotion tags for peer matching, analytics, and risk assessment.
+
+- **Example Pipeline:**
+  1. User sends a message.
+  2. LLM (e.g., Qwen2.5 72B Instruct) generates a friendly, supportive reply.
+  3. Message is analyzed by SamLowe/roberta-base-go_emotions for emotion tags.
+  4. Message is analyzed by the sentiment model trained on the Kaggle dataset for sentiment label.
+  5. Results are stored and used for matching, analytics, and crisis detection.
+
+**Personalization**
+- Adapt AI responses to user's personality and communication style.
+- Use conversation history for context.
+
+**Matching Optimization**
+- Continuously improve peer matching algorithm based on feedback and outcomes.
+- Use tags, emotional state, and user preferences for compatibility scoring.
+
+---
+
+## 7. Security & Privacy
+
+- All user data encrypted at rest and in transit.
+- Row-level security and access controls for all tables.
+- Users can export or delete their data at any time.
+- Consent management for all personal and emotional data.
+- Anonymous and pseudonymous usage supported throughout.
+- Automated monitoring for abuse, crisis, or policy violations.
+
+---
+
+## 8. Success Metrics & KPIs
+
+- System uptime: 99.9%+
+- AI response time: <2s
+- Emotion detection accuracy: >85%
+- User engagement: >70% weekly active users
+- Session duration: avg. 15+ minutes
+- Peer match success rate: >80%
+- Crisis intervention success rate: >90%
+- User satisfaction: >4.2/5.0
+
+---
+
+## 9. Risk Management
+
+- Regular model bias testing and retraining.
+- Fallback mechanisms for AI/ML and API failures.
+- Automated backups and disaster recovery.
+- Security audits and penetration testing.
+- Privacy breach monitoring and rapid response.
+- Vendor lock-in mitigation: standard SQL schema, data export tools.
+
+---
+
+## 10. Roadmap
+
+**Phase 1 (MVP, 3 months)**
+- User onboarding, profile, and privacy controls
+- AI chatbot with emotion detection
+- Peer matching and ticketing
+- Real-time chat
+- Crisis detection and basic moderation
+
+**Phase 2 (6 months)**
+- Advanced emotion analysis
+- Group chat and community features
+- Gamification and achievements
+- Mobile app
+- Professional resource integration
+
+**Phase 3 (12 months)**
+- Personalized AI therapy sessions
+- Predictive analytics
+- Wearable device integration
+- Advanced crisis prevention
+- Research partnerships
+
+---
+
+## 6. Data Authenticity & Realtime Policy
+
+**No Dummy Data Policy**
+- At no point during development, testing, or production should any dummy, placeholder, or hardcoded data (e.g., fake users, chats, or sample messages) be used in the application.
+- All user profiles, chats, tickets, and emotional assessments must be created and managed in realtime by actual users of the system.
+- Automated scripts or bots for seeding data are strictly prohibited unless explicitly approved for load testing, and such data must be clearly marked and removed before production.
+- All features (including onboarding, chat, matching, and feedback) must be tested and demonstrated using only real, live data generated through the app's actual user flows.
+- This policy applies to all environments (development, staging, production) to ensure the integrity and authenticity of the user experience.
+
+---

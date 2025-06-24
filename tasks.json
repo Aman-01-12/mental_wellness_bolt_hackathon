@@ -1,0 +1,200 @@
+{
+    "master": {
+      "tasks": [
+        {
+          "id": 1,
+          "title": "Setup Project Repository",
+          "description": "Initialize the project repository with necessary configurations and dependencies.",
+          "details": "Create a new repository on GitHub. Initialize with a README, LICENSE, and .gitignore file. Set up the project structure and install necessary dependencies such as Node.js, Supabase, and other required libraries. Ensure the repository is properly configured for CI/CD.",
+          "testStrategy": "Verify the repository structure, ensure all dependencies are installed correctly, and run initial tests to confirm the setup.",
+          "priority": "high",
+          "dependencies": [],
+
+          "subtasks": []
+        },
+        {
+          "id": 2,
+          "title": "Implement User Registration and Authentication",
+          "description": "Develop the user registration and authentication system using Supabase Auth.",
+          "details": "Create REST endpoints for user registration, login, and logout. Implement email verification and support for anonymous or pseudonymous display names. Use Supabase Auth for managing user sessions and authentication.",
+          "testStrategy": "Test user registration, login, and logout flows. Verify email verification and ensure anonymous/pseudonymous display names are handled correctly.",
+          "priority": "high",
+          "dependencies": [
+            1
+          ],
+          
+          "subtasks": []
+        },
+        {
+          "id": 3,
+          "title": "Develop Onboarding Flow",
+          "description": "Create a multi-step onboarding process to collect user data.",
+          "details": "Design and implement a multi-step onboarding flow with a progress indicator. Collect optional data points as specified in the PRD. Ensure users can skip or edit any step and manage consent for each data point. Use Supabase to store user profiles.",
+          "testStrategy": "Test the onboarding flow, verify data collection, and ensure users can skip or edit steps. Check consent management and data storage in Supabase.",
+          "priority": "high",
+          "dependencies": [
+            2
+          ],
+          
+          "subtasks": []
+        },
+        {
+          "id": 4,
+          "title": "Implement AI Chatbot Integration",
+          "description": "Integrate the Qwen2.5 72B Instruct model via OpenRouter API for AI chatbot functionality.",
+          "details": "Set up API calls to Qwen2.5 72B Instruct for generating empathetic, context-aware responses. Implement conversation memory to maintain context using recent message history. Ensure the chatbot is available 24/7.",
+          "testStrategy": "Test AI chatbot responses for empathy, context awareness, and availability. Verify conversation memory and context retention.",
+          "priority": "high",
+          "dependencies": [
+            1
+          ],
+          
+          "subtasks": []
+        },
+        {
+          "id": 5,
+          "title": "Develop Emotional State Assessment",
+          "description": "Implement emotional state assessment within the AI companion chat.",
+          "details": "Use NLP and sentiment/emotion models to analyze user input for emotional state. Detect and tag emotions, identify context, and flag high-risk situations. Implement pop-ups for continuing with AI or getting matched with a peer.",
+          "testStrategy": "Test emotional state assessment accuracy, emotion tagging, and context identification. Verify high-risk situation flagging and pop-up functionality.",
+          "priority": "high",
+          "dependencies": [
+            4
+          ],
+          
+          "subtasks": []
+        },
+        {
+          "id": 6,
+          "title": "Create Peer Matching System",
+          "description": "Develop the peer matching system based on emotional state and user preferences.",
+          "details": "Implement the matching workflow as specified in the PRD. Create tickets/flags for users seeking support and enable other users to browse and connect. Ensure all matching is opt-in and privacy-first.",
+          "testStrategy": "Test the peer matching workflow, verify ticket creation and browsing, and ensure privacy controls are in place. Check opt-in functionality and user control over matching.",
+          "priority": "medium",
+          "dependencies": [
+            5
+          ],
+          
+          "subtasks": []
+        },
+        {
+          "id": 7,
+          "title": "Implement Real-Time Chat Infrastructure",
+          "description": "Set up real-time messaging between users and/or AI companion.",
+          "details": "Use WebSocket-based implementation (e.g., Supabase Realtime or Socket.IO) to support one-on-one and group chats. Implement typing indicators, read receipts, and message history. Ensure emoji reactions and basic rich text support.",
+          "testStrategy": "Test real-time messaging, typing indicators, read receipts, and message history. Verify emoji reactions and rich text support.",
+          "priority": "medium",
+          "dependencies": [
+            6
+          ],
+        
+          "subtasks": []
+        },
+        {
+          "id": 8,
+          "title": "Develop Safety and Moderation Features",
+          "description": "Implement automated content filtering, crisis detection, and user reporting features.",
+          "details": "Set up automated content filtering for harmful or inappropriate content. Implement crisis detection to trigger immediate intervention options. Develop user reporting and blocking features, and a moderation dashboard for community managers.",
+          "testStrategy": "Test content filtering, crisis detection, and user reporting features. Verify the moderation dashboard and ensure privacy options are functional.",
+          "priority": "medium",
+          "dependencies": [
+            7
+          ],
+          
+          "subtasks": [
+            {
+              "id": 1,
+              "title": "Design Content Filtering Algorithm",
+              "description": "Develop the logic for automated content filtering based on predefined rules and machine learning models.",
+              "dependencies": [],
+              "details": "Identify key words, phrases, and patterns that need to be filtered. Implement natural language processing techniques.",
+            
+            },
+            {
+              "id": 2,
+              "title": "Implement Crisis Detection System",
+              "description": "Create a system to detect potential crises or harmful content in real-time.",
+              "dependencies": [],
+              "details": "Use sentiment analysis and anomaly detection to identify crisis situations. Integrate with content filtering.",
+             
+            },
+            {
+              "id": 3,
+              "title": "Develop User Reporting Mechanism",
+              "description": "Build a feature allowing users to report inappropriate content or behavior.",
+              "dependencies": [],
+              "details": "Design a user-friendly reporting interface. Ensure reports are logged and can be reviewed by moderators.",
+              
+            },
+            {
+              "id": 4,
+              "title": "Create User Blocking Feature",
+              "description": "Implement functionality to block users who violate community guidelines.",
+              "dependencies": [
+                1,
+                2,
+                3
+              ],
+              "details": "Define criteria for blocking users. Ensure blocked users cannot access certain features or content.",
+              
+            },
+            {
+              "id": 5,
+              "title": "Design Moderation Dashboard",
+              "description": "Develop a dashboard for moderators to manage reported content and user violations.",
+              "dependencies": [
+                1,
+                2,
+                3
+              ],
+              "details": "Include features for reviewing reports, taking actions (e.g., removing content, warning users), and generating reports.",
+             
+            },
+            {
+              "id": 6,
+              "title": "Integrate and Test Features",
+              "description": "Ensure all features work seamlessly together and conduct thorough testing.",
+              "dependencies": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "details": "Perform unit testing, integration testing, and user acceptance testing. Fix any identified bugs or issues.",
+              
+            }
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Implement Gamification and Achievements",
+          "description": "Add gamification elements to encourage user engagement and positive behavior.",
+          "details": "Develop a profile completion progress bar and incentives for completing onboarding. Implement badges and achievements for positive feedback and behavior. Ensure the feedback system is integrated with the chat flow.",
+          "testStrategy": "Test the gamification elements, verify badge and achievement awards, and ensure the feedback system is functional. Check user engagement and positive behavior encouragement.",
+          "priority": "low",
+          "dependencies": [
+            8
+          ],
+         
+          "subtasks": []
+        },
+        {
+          "id": 10,
+          "title": "Set Up Database and API Endpoints",
+          "description": "Configure the Supabase/PostgreSQL database and implement necessary API endpoints.",
+          "details": "Design and set up the database schema as specified in the PRD. Implement REST and WebSocket endpoints for user management, AI interactions, peer matching, and real-time chat. Ensure all endpoints are secure and compliant with privacy requirements.",
+          "testStrategy": "Test database schema, verify API endpoints, and ensure data security and privacy compliance. Check endpoint functionality and performance.",
+          "priority": "high",
+          "dependencies": [],
+      
+          "subtasks": []
+        }
+      ],
+      "metadata": {
+        "created": "2025-06-23T18:13:17.737Z",
+        "updated": "2025-06-23T18:13:17.737Z",
+        "description": "Tasks for master context"
+      }
+    }
+  }
