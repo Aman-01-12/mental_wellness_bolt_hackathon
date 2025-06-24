@@ -143,7 +143,7 @@ export function ChatInterface() {
                       <Sparkles className="w-4 h-4 text-primary-500" />
                     </h1>
                     <p className="text-sm text-gray-500">
-                      {isTyping ? 'Typing...' : isAnalyzing ? 'Understanding your emotions...' : 'Your adaptive AI companion • Powered by Gemini & Qwen'}
+                      {isTyping ? 'Thinking...' : isAnalyzing ? 'Understanding your emotions...' : 'Your gentle AI companion • Adapts to you'}
                     </p>
                   </div>
                 </div>
@@ -280,7 +280,7 @@ export function ChatInterface() {
                     value={inputValue}
                     onChange={(e) => setInputValue(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="Share what's on your mind... Alex adapts to how you communicate 💙"
+                    placeholder="Share what's on your mind... Alex keeps responses gentle and easy to read 💙"
                     className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors resize-none"
                     rows={1}
                     style={{
@@ -313,7 +313,7 @@ export function ChatInterface() {
               </form>
               
               <p className="text-xs text-gray-500 mt-3 text-center">
-                Press Enter to send, Shift+Enter for new line. Alex learns your communication style and adapts over time.
+                Press Enter to send, Shift+Enter for new line. Alex adapts to your style and keeps things gentle when you're upset.
               </p>
             </div>
           </div>

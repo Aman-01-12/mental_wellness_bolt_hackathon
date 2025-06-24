@@ -27,12 +27,12 @@ export function useChat(): UseChatReturn {
   const abortControllerRef = useRef<AbortController | null>(null);
   const { user } = useAuthStore();
 
-  // Initialize with a more natural welcome message
+  // Initialize with a gentle, natural welcome message
   useEffect(() => {
     const welcomeMessage: ChatHookMessage = {
       id: 'welcome',
       role: 'assistant',
-      content: "Hey there! I'm Alex 😊 I'm here to listen and chat about whatever's on your mind. How are you doing today?",
+      content: "Hey there! I'm Alex 😊 What's on your mind today?",
       timestamp: new Date()
     };
     setMessages([welcomeMessage]);
@@ -72,7 +72,11 @@ export function useChat(): UseChatReturn {
           : msg
       ));
 
-      // Show typing indicator with more natural timing
+      // Show typing indicator with natural timing (shorter for distressed users)
+      const isDistressed = emotionAnalysis.mental_health_indicators.anxiety_level > 0.6 ||
+                          emotionAnalysis.mental_health_indicators.depression_level > 0.6 ||
+                          emotionAnalysis.mental_health_indicators.stress_level > 0.7;
+      
       setIsTyping(true);
       const typingMessage: ChatHookMessage = {
         id: 'typing',
@@ -83,8 +87,9 @@ export function useChat(): UseChatReturn {
       };
       setMessages(prev => [...prev, typingMessage]);
 
-      // Add a small delay to make it feel more natural
-      await new Promise(resolve => setTimeout(resolve, 800 + Math.random() * 1200));
+      // Shorter delay for distressed users, longer for casual chat
+      const typingDelay = isDistressed ? 600 + Math.random() * 800 : 800 + Math.random() * 1200;
+      await new Promise(resolve => setTimeout(resolve, typingDelay));
 
       // Prepare conversation history for AI
       const conversationHistory: ChatMessage[] = messages
@@ -115,7 +120,7 @@ export function useChat(): UseChatReturn {
       conversationHistory.push(userMessageWithContext);
 
       // Get AI response with user ID for style adaptation
-      console.log('🤖 Getting adaptive Gemini AI response...');
+      console.log('🤖 Getting gentle, adaptive Gemini AI response...');
       const aiResponse = await aiService.sendMessage(conversationHistory, user?.id);
 
       // Remove typing indicator and add AI response
@@ -139,11 +144,11 @@ export function useChat(): UseChatReturn {
       const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
       setError(errorMessage);
       
-      // Add a more natural error message
+      // Add a gentle, natural error message
       const errorChatMessage: ChatHookMessage = {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: "Sorry, I'm having some technical difficulties right now. Can you try sending that again? I'm still here and want to help! 💙",
+        content: "Sorry, I'm having some trouble right now. Can you try again? I'm still here 💙",
         timestamp: new Date()
       };
       setMessages(prev => [...prev, errorChatMessage]);
@@ -169,7 +174,7 @@ export function useChat(): UseChatReturn {
     const welcomeMessage: ChatHookMessage = {
       id: 'welcome-new',
       role: 'assistant',
-      content: "Hey again! 😊 Fresh start - I'm here to listen. What's going on?",
+      content: "Hey again! 😊 Fresh start. What's going on?",
       timestamp: new Date()
     };
     setMessages([welcomeMessage]);

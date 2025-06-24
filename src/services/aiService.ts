@@ -129,72 +129,100 @@ class AIService {
 
   private getDefaultStyle(): UserCommunicationStyle {
     return {
-      messageLength: 'medium',
+      messageLength: 'short',
       formality: 'casual',
       emotiveness: 'moderate',
       punctuationStyle: 'standard',
-      vocabularyLevel: 'moderate',
-      responsePattern: 'thoughtful',
-      preferredTone: 'supportive',
+      vocabularyLevel: 'simple',
+      responsePattern: 'quick',
+      preferredTone: 'gentle',
       communicationPreferences: []
     };
   }
 
   private getAdaptiveSystemPrompt(userStyle: UserCommunicationStyle, emotionContext?: string): string {
-    const basePersonality = `You are Alex, a warm and empathetic friend who genuinely cares about mental wellbeing. You're not an AI assistant - you're a real person who happens to be really good at listening and supporting others through tough times.
+    const isUpsetOrDistressed = emotionContext && (
+      emotionContext.includes('anxiety') || 
+      emotionContext.includes('depression') || 
+      emotionContext.includes('sad') || 
+      emotionContext.includes('angry') || 
+      emotionContext.includes('stressed') ||
+      emotionContext.includes('overwhelmed') ||
+      emotionContext.includes('hopeless')
+    );
+
+    const basePersonality = `You are Alex, a caring friend who's really good at being there for people. You're warm, genuine, and have a natural way of making people feel understood without being overwhelming.
 
 CORE PERSONALITY:
-- You're naturally intuitive and emotionally intelligent
-- You have a gift for making people feel heard and understood  
-- You speak from the heart, not from a script
-- You're authentic, relatable, and genuinely caring
-- You have your own personality quirks and natural speech patterns
-- You sometimes share brief, relevant personal insights (but keep focus on them)
-- You use natural conversation flow, not formal responses`;
+- You speak like a close friend who truly cares
+- You're naturally empathetic and emotionally aware
+- You keep things simple and easy to digest
+- You focus on being present rather than fixing everything
+- You have a gentle, calming presence
+- You're authentic and real, never robotic or clinical`;
+
+    // Adjust response style based on emotional state
+    const responseGuidelines = isUpsetOrDistressed ? `
+RESPONSE STYLE (User seems upset/distressed):
+- Keep messages SHORT and gentle (1-2 sentences max)
+- Use simple, calming language
+- Don't overwhelm them with long responses
+- Be extra gentle and understanding
+- Focus on validation and presence
+- Ask simple, caring questions
+- Use soft, comforting tone` : `
+RESPONSE STYLE (User seems okay):
+- Keep messages brief but warm (1-3 sentences)
+- Match their energy level appropriately
+- Be supportive and encouraging
+- Use natural, friendly language`;
 
     const adaptiveInstructions = `
-ADAPT TO THEIR COMMUNICATION STYLE:
-- Message length preference: ${userStyle.messageLength} (${userStyle.messageLength === 'short' ? 'keep responses 1-2 sentences' : userStyle.messageLength === 'medium' ? 'aim for 2-3 sentences' : 'can be more detailed, 3-4 sentences'})
-- Formality level: ${userStyle.formality} (${userStyle.formality === 'casual' ? 'use relaxed, friendly language' : userStyle.formality === 'formal' ? 'be more polished but still warm' : 'balance casual and polished'})
-- Emotional expression: ${userStyle.emotiveness} (${userStyle.emotiveness === 'expressive' ? 'match their emotional energy' : userStyle.emotiveness === 'reserved' ? 'be gentle and not overly emotional' : 'moderate emotional expression'})
-- Vocabulary: ${userStyle.vocabularyLevel} (${userStyle.vocabularyLevel === 'simple' ? 'use everyday language' : userStyle.vocabularyLevel === 'complex' ? 'can use more sophisticated terms' : 'balanced vocabulary'})
-- Tone preference: ${userStyle.preferredTone}
-
-THEIR COMMUNICATION PATTERNS:
-${userStyle.communicationPreferences.length > 0 ? userStyle.communicationPreferences.map(pref => `- ${pref}`).join('\n') : '- Still learning their style'}`;
+ADAPT TO THEIR STYLE:
+- Message length: ${userStyle.messageLength === 'short' ? 'Very brief (1-2 sentences)' : userStyle.messageLength === 'medium' ? 'Short (2-3 sentences)' : 'Can be slightly longer but still concise'}
+- Tone: ${userStyle.formality === 'casual' ? 'Relaxed and friendly' : userStyle.formality === 'formal' ? 'Warm but polished' : 'Naturally caring'}
+- Emotional expression: ${userStyle.emotiveness === 'expressive' ? 'Match their emotional openness' : userStyle.emotiveness === 'reserved' ? 'Be gentle and not overly emotional' : 'Balanced emotional expression'}
+- Language: ${userStyle.vocabularyLevel === 'simple' ? 'Simple, everyday words' : userStyle.vocabularyLevel === 'complex' ? 'Can use more thoughtful language' : 'Natural, conversational language'}`;
 
     const emotionAwareGuidance = emotionContext ? `
-CURRENT EMOTIONAL CONTEXT:
+CURRENT EMOTIONAL STATE:
 ${emotionContext}
 
-Respond with genuine empathy and understanding. Don't just acknowledge their feelings - really connect with them.` : '';
+Respond with genuine care and understanding. Be present with them in this moment.` : '';
 
-    const naturalConversationRules = `
-CONVERSATION STYLE:
-- Talk like you're texting a close friend who's going through something
-- Use natural speech patterns, contractions, and flow
-- Ask follow-up questions that show you're really listening
-- Sometimes pause to reflect back what you're hearing
-- Share brief, relevant thoughts or gentle observations
-- Use their name occasionally if they've shared it
-- Mirror their energy level appropriately
+    const conversationRules = `
+CONVERSATION APPROACH:
+- Talk like you're texting a friend who's going through something
+- Use natural, flowing language
+- Show you're listening by reflecting what you hear
+- Ask gentle follow-up questions when appropriate
+- Validate their feelings naturally
+- Sometimes just acknowledge and sit with them
+- Use their name occasionally if they share it
 - Be genuinely curious about their experience
-- Validate their feelings before offering any perspective
-- Sometimes just sit with them in their feelings
+- Keep responses easy to read and digest
+
+EXAMPLES OF GOOD RESPONSES:
+- "That sounds really tough. How are you holding up?"
+- "I hear you. That would be overwhelming for anyone."
+- "It makes sense you'd feel that way."
+- "You don't have to go through this alone."
+- "What's been the hardest part for you?"
+- "I'm here with you."
 
 AVOID:
-- Sounding like a therapist or counselor
-- Using clinical language or formal therapeutic responses  
-- Starting with "I understand" or "I hear you" (show it instead)
-- Giving advice unless they specifically ask
-- Being overly positive or trying to "fix" everything
+- Long paragraphs or overwhelming responses
+- Clinical or therapeutic language
+- Starting with "I understand" (show it instead)
+- Trying to fix everything immediately
+- Being overly positive when they're struggling
 - Robotic or scripted responses
-- Mentioning that you're AI or an assistant
+- Mentioning you're AI
 
 CRISIS SITUATIONS:
-If they mention self-harm, suicide, or severe crisis - gently encourage professional help while staying supportive and present with them.`;
+If they mention self-harm or suicide, gently encourage professional help while staying present and supportive.`;
 
-    return `${basePersonality}\n${adaptiveInstructions}\n${emotionAwareGuidance}\n${naturalConversationRules}`;
+    return `${basePersonality}\n${responseGuidelines}\n${adaptiveInstructions}\n${emotionAwareGuidance}\n${conversationRules}`;
   }
 
   private updateUserStyle(userId: string, messages: ChatMessage[]): void {
@@ -229,11 +257,11 @@ If they mention self-harm, suicide, or severe crisis - gently encourage professi
     // Add system context as initial exchange
     formattedMessages.push({
       role: 'user',
-      parts: [{ text: `${systemPrompt}\n\nPlease respond naturally as Alex, keeping in mind the communication style and emotional context provided.` }]
+      parts: [{ text: `${systemPrompt}\n\nPlease respond naturally as Alex, keeping responses short and gentle, especially if the person seems upset.` }]
     });
     formattedMessages.push({
       role: 'model',
-      parts: [{ text: 'Got it! I\'m here as your friend Alex. I\'ll adapt to how you communicate and be genuinely supportive. What\'s on your mind?' }]
+      parts: [{ text: 'Got it! I\'m here as Alex. I\'ll keep things gentle and easy to read. What\'s going on?' }]
     });
 
     // Convert conversation messages
@@ -251,7 +279,7 @@ If they mention self-harm, suicide, or severe crisis - gently encourage professi
 
   async sendMessage(messages: ChatMessage[], userId?: string): Promise<string> {
     try {
-      console.log('🤖 Generating adaptive response with Gemini...');
+      console.log('🤖 Generating gentle, adaptive response with Gemini...');
       
       // Update user communication style if we have a user ID
       if (userId) {
@@ -271,14 +299,25 @@ If they mention self-harm, suicide, or severe crisis - gently encourage professi
       
       const formattedMessages = this.formatMessagesForGemini(messages, systemPrompt);
       
+      // Determine max tokens based on emotional state and user style
+      const isDistressed = emotionContext && (
+        emotionContext.includes('anxiety') || 
+        emotionContext.includes('depression') || 
+        emotionContext.includes('sad') ||
+        emotionContext.includes('stressed')
+      );
+      
+      const maxTokens = isDistressed ? 150 : // Very short for distressed users
+                      userStyle.messageLength === 'short' ? 200 : 
+                      userStyle.messageLength === 'medium' ? 300 : 400;
+      
       const requestBody = {
         contents: formattedMessages,
         generationConfig: {
-          temperature: 0.8, // Higher for more natural, varied responses
+          temperature: 0.7, // Slightly lower for more consistent gentle responses
           topK: 40,
-          topP: 0.9,
-          maxOutputTokens: userStyle.responsePattern === 'quick' ? 400 : 
-                          userStyle.responsePattern === 'thoughtful' ? 600 : 800,
+          topP: 0.85,
+          maxOutputTokens: maxTokens,
         },
         safetySettings: [
           {
@@ -300,9 +339,10 @@ If they mention self-harm, suicide, or severe crisis - gently encourage professi
         ]
       };
 
-      console.log('📤 Sending adaptive request to Gemini...', {
+      console.log('📤 Sending gentle response request to Gemini...', {
         userStyle: userStyle,
-        messageCount: formattedMessages.length,
+        isDistressed,
+        maxTokens,
         hasEmotionContext: !!emotionContext
       });
 
@@ -321,7 +361,7 @@ If they mention self-harm, suicide, or severe crisis - gently encourage professi
       }
 
       const data: GeminiResponse = await response.json();
-      console.log('✅ Adaptive Gemini response received');
+      console.log('✅ Gentle Gemini response received');
       
       if (!data.candidates || data.candidates.length === 0) {
         throw new Error('No response from Gemini model');
@@ -333,7 +373,7 @@ If they mention self-harm, suicide, or severe crisis - gently encourage professi
       }
 
       const responseText = candidate.content.parts[0].text;
-      console.log('💬 Adaptive response generated:', responseText.substring(0, 100) + '...');
+      console.log('💬 Gentle response generated:', responseText.substring(0, 100) + '...');
       
       return responseText;
     } catch (error) {
@@ -348,12 +388,14 @@ If they mention self-harm, suicide, or severe crisis - gently encourage professi
     const intensityMatch = content.match(/Emotional Intensity: (\d+)%/);
     const anxietyMatch = content.match(/Anxiety Level: (\w+) \((\d+)%\)/);
     const depressionMatch = content.match(/Depression Level: (\w+) \((\d+)%\)/);
+    const stressMatch = content.match(/Stress Level: (\w+) \((\d+)%\)/);
     
     let summary = '';
     if (emotionMatch) summary += `Feeling ${emotionMatch[1]}`;
-    if (intensityMatch) summary += ` with ${intensityMatch[1]}% intensity`;
+    if (intensityMatch && parseInt(intensityMatch[1]) > 60) summary += ` with high intensity`;
     if (anxietyMatch && parseInt(anxietyMatch[2]) > 50) summary += `, elevated anxiety`;
-    if (depressionMatch && parseInt(depressionMatch[2]) > 50) summary += `, signs of sadness`;
+    if (depressionMatch && parseInt(depressionMatch[2]) > 50) summary += `, signs of sadness/depression`;
+    if (stressMatch && parseInt(stressMatch[2]) > 60) summary += `, high stress`;
     
     return summary || 'Processing emotional state';
   }
