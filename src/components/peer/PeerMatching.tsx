@@ -5,6 +5,7 @@ import { Users, ArrowLeft } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { useAuthStore } from '../../store/authStore';
+import { supabase } from '../../lib/supabase';
 
 const AGE_RANGES = [
   '13-17', '18-24', '25-34', '35-44', '45-54', '55-64', '65+'
