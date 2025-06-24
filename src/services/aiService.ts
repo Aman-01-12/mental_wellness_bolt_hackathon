@@ -3,24 +3,24 @@ interface ChatMessage {
   content: string;
 }
 
-interface OpenRouterResponse {
-  choices: Array<{
-    message: {
-      content: string;
-      role: string;
+interface GeminiResponse {
+  candidates: Array<{
+    content: {
+      parts: Array<{
+        text: string;
+      }>;
     };
   }>;
 }
 
 class AIService {
   private apiKey: string;
-  private baseUrl = 'https://openrouter.ai/api/v1/chat/completions';
-  private model = 'qwen/qwen-2.5-72b-instruct';
+  private baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
   constructor() {
-    this.apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
+    this.apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!this.apiKey) {
-      throw new Error('OpenRouter API key is not configured');
+      throw new Error('Google Gemini API key is not configured');
     }
   }
 
@@ -62,46 +62,109 @@ Remember: You have access to detailed emotion analysis including primary emotion
 You are not a replacement for professional mental health care, but you are a valuable source of immediate emotional support and companionship.`;
   }
 
+  private formatMessagesForGemini(messages: ChatMessage[]): any {
+    // Convert our message format to Gemini's format
+    const systemPrompt = this.getSystemPrompt();
+    
+    // Gemini uses a different format - we'll include the system prompt as the first user message
+    const formattedMessages = [];
+    
+    // Add system prompt as context
+    if (messages.length > 0) {
+      formattedMessages.push({
+        role: 'user',
+        parts: [{ text: `${systemPrompt}\n\nNow please respond to the following conversation:` }]
+      });
+      formattedMessages.push({
+        role: 'model',
+        parts: [{ text: 'I understand. I\'m here to provide compassionate mental health support. I\'ll respond empathetically to the conversation, keeping in mind the emotional context and analysis provided.' }]
+      });
+    }
+
+    // Convert our messages to Gemini format
+    messages.forEach(message => {
+      if (message.role === 'system') return; // Skip system messages as we handle them differently
+      
+      formattedMessages.push({
+        role: message.role === 'user' ? 'user' : 'model',
+        parts: [{ text: message.content }]
+      });
+    });
+
+    return formattedMessages;
+  }
+
   async sendMessage(messages: ChatMessage[]): Promise<string> {
     try {
-      const systemMessage: ChatMessage = {
-        role: 'system',
-        content: this.getSystemPrompt()
+      console.log('🤖 Sending message to Google Gemini...');
+      
+      const formattedMessages = this.formatMessagesForGemini(messages);
+      
+      const requestBody = {
+        contents: formattedMessages,
+        generationConfig: {
+          temperature: 0.7,
+          topK: 40,
+          topP: 0.9,
+          maxOutputTokens: 800,
+        },
+        safetySettings: [
+          {
+            category: "HARM_CATEGORY_HARASSMENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_HATE_SPEECH",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          },
+          {
+            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+            threshold: "BLOCK_MEDIUM_AND_ABOVE"
+          }
+        ]
       };
 
-      const response = await fetch(this.baseUrl, {
+      console.log('📤 Gemini request:', {
+        url: `${this.baseUrl}?key=${this.apiKey.substring(0, 10)}...`,
+        messageCount: formattedMessages.length
+      });
+
+      const response = await fetch(`${this.baseUrl}?key=${this.apiKey}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
-          'HTTP-Referer': window.location.origin,
-          'X-Title': 'MindSpace AI Companion'
         },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [systemMessage, ...messages],
-          temperature: 0.7,
-          max_tokens: 800,
-          top_p: 0.9,
-          frequency_penalty: 0.1,
-          presence_penalty: 0.1
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(`OpenRouter API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
+        console.error('❌ Gemini API error:', response.status, errorData);
+        throw new Error(`Gemini API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
       }
 
-      const data: OpenRouterResponse = await response.json();
+      const data: GeminiResponse = await response.json();
+      console.log('✅ Gemini response received');
       
-      if (!data.choices || data.choices.length === 0) {
-        throw new Error('No response from AI model');
+      if (!data.candidates || data.candidates.length === 0) {
+        throw new Error('No response from Gemini model');
       }
 
-      return data.choices[0].message.content;
+      const candidate = data.candidates[0];
+      if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+        throw new Error('Invalid response structure from Gemini');
+      }
+
+      const responseText = candidate.content.parts[0].text;
+      console.log('💬 Gemini response:', responseText.substring(0, 100) + '...');
+      
+      return responseText;
     } catch (error) {
-      console.error('AI Service Error:', error);
+      console.error('❌ AI Service Error:', error);
       throw new Error(error instanceof Error ? error.message : 'Failed to get AI response');
     }
   }
