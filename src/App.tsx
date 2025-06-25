@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import { useAuthStore } from './store/authStore'
 import { AuthPage } from './components/auth/AuthPage'
-import Dashboard from './components/dashboard/Dashboard'
+import { Dashboard } from './components/dashboard/Dashboard'
 import LoadingSpinner from './components/ui/LoadingSpinner'
 
 function App() {
