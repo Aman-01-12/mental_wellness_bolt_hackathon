@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'framer-motion';
-import { Users, ArrowLeft } from 'lucide-react';
+import { Users, ArrowLeft, Search, Filter, Heart, Clock, User } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { useAuthStore } from '../../store/authStore';
@@ -28,15 +28,37 @@ interface FormData {
   details: string;
 }
 
+interface Ticket {
+  id: string;
+  display_name: string;
+  age_range: string | null;
+  emotional_state: string;
+  need_tags: string[];
+  details: any;
+  user_id: string;
+  created_at: string;
+}
+
 export function PeerMatching() {
   const navigate = useNavigate();
   const { profile } = useAuthStore();
+  const [activeTab, setActiveTab] = useState<'create' | 'browse' | 'my-tickets'>('browse');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Browse tickets state
+  const [availableTickets, setAvailableTickets] = useState<Ticket[]>([]);
+  const [browsing, setBrowsing] = useState(false);
+  const [browseError, setBrowseError] = useState<string | null>(null);
+  const [filters, setFilters] = useState({
+    emotional_state: '',
+    need_tag: '',
+    age_range: ''
+  });
+
   // My tickets state
   const [myTickets, setMyTickets] = useState<any[]>([]);
-  const [myTicketsLoading, setMyTicketsLoading] = useState(true);
+  const [myTicketsLoading, setMyTicketsLoading] = useState(false);
   const [myTicketsError, setMyTicketsError] = useState<string | null>(null);
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
 
@@ -52,48 +74,112 @@ export function PeerMatching() {
 
   const selectedTags = watch('need_tags') || [];
 
+  // Fetch available tickets for browsing
   React.useEffect(() => {
-    const fetchMyTickets = async () => {
-      setMyTicketsLoading(true);
-      setMyTicketsError(null);
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        if (!supabaseUrl) throw new Error('Supabase URL not configured');
-        const response = await fetch(`${supabaseUrl}/functions/v1/list-tickets`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (!response.ok) {
-          const errorText = await response.text();
-          let errorData;
-          try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
-          throw new Error(errorData.error || `HTTP ${response.status} error`);
+    if (activeTab === 'browse') {
+      fetchAvailableTickets();
+    }
+  }, [activeTab, filters]);
+
+  // Fetch my tickets
+  React.useEffect(() => {
+    if (activeTab === 'my-tickets') {
+      fetchMyTickets();
+    }
+  }, [activeTab]);
+
+  const fetchAvailableTickets = async () => {
+    setBrowsing(true);
+    setBrowseError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
+      
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) throw new Error('Supabase URL not configured');
+
+      // Build query params for filtering
+      const params = new URLSearchParams();
+      if (filters.emotional_state) params.append('emotional_state', filters.emotional_state);
+      if (filters.need_tag) params.append('need_tag', filters.need_tag);
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/list-tickets?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
         }
-        const result = await response.json();
-        if (!result.success) throw new Error(result.error || 'Failed to fetch tickets');
-        // Filter tickets to only those created by the current user
-        setMyTickets((result.tickets || []).filter((t: any) => t.user_id === profile?.id));
-      } catch (err: any) {
-        setMyTicketsError(err.message || 'Failed to load your tickets');
-      } finally {
-        setMyTicketsLoading(false);
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
+        throw new Error(errorData.error || `HTTP ${response.status} error`);
       }
-    };
-    if (profile?.id) fetchMyTickets();
-  }, [profile?.id]);
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || 'Failed to fetch tickets');
+
+      // Filter out user's own tickets
+      const filteredTickets = (result.tickets || []).filter((ticket: Ticket) => 
+        ticket.user_id !== profile?.id
+      );
+
+      setAvailableTickets(filteredTickets);
+    } catch (err: any) {
+      setBrowseError(err.message || 'Failed to load available tickets');
+    } finally {
+      setBrowsing(false);
+    }
+  };
+
+  const fetchMyTickets = async () => {
+    setMyTicketsLoading(true);
+    setMyTicketsError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
+      
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) throw new Error('Supabase URL not configured');
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/list-tickets`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
+        throw new Error(errorData.error || `HTTP ${response.status} error`);
+      }
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || 'Failed to fetch tickets');
+
+      // Filter to only user's own tickets
+      setMyTickets((result.tickets || []).filter((t: any) => t.user_id === profile?.id));
+    } catch (err: any) {
+      setMyTicketsError(err.message || 'Failed to load your tickets');
+    } finally {
+      setMyTicketsLoading(false);
+    }
+  };
 
   const handleWithdraw = async (ticketId: string) => {
     setWithdrawingId(ticketId);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
+      
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) throw new Error('Supabase URL not configured');
+      
       const response = await fetch(`${supabaseUrl}/functions/v1/withdraw-ticket`, {
         method: 'POST',
         headers: {
@@ -102,12 +188,14 @@ export function PeerMatching() {
         },
         body: JSON.stringify({ ticket_id: ticketId })
       });
+
       if (!response.ok) {
         const errorText = await response.text();
         let errorData;
         try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
         throw new Error(errorData.error || `HTTP ${response.status} error`);
       }
+
       // Remove withdrawn ticket from state
       setMyTickets((prev) => prev.filter((t) => t.id !== ticketId));
     } catch (err: any) {
@@ -124,13 +212,11 @@ export function PeerMatching() {
     try {
       console.log('🎫 Creating ticket with data:', data);
       
-      // Get the auth token from Supabase session
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         throw new Error('No authentication session found. Please sign in again.');
       }
 
-      // Call the Edge Function with proper URL
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) {
         throw new Error('Supabase URL not configured');
@@ -151,50 +237,26 @@ export function PeerMatching() {
         })
       });
 
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
-
-      // Check if response is ok
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ HTTP Error:', response.status, errorText);
-        
-        // Try to parse as JSON, fallback to text
         let errorData;
         try {
           errorData = JSON.parse(errorText);
         } catch {
           errorData = { error: errorText || `HTTP ${response.status} error` };
         }
-        
         throw new Error(errorData.error || `Server error: ${response.status}`);
       }
 
-      // Parse response
-      const responseText = await response.text();
-      console.log('📡 Raw response:', responseText);
-
-      if (!responseText) {
-        throw new Error('Empty response from server');
-      }
-
-      let result;
-      try {
-        result = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('❌ JSON Parse Error:', parseError);
-        console.error('❌ Response text:', responseText);
-        throw new Error('Invalid response format from server');
-      }
-
-      console.log('✅ Parsed result:', result);
-
+      const result = await response.json();
       if (!result.success) {
         throw new Error(result.error || 'Failed to create ticket');
       }
 
       console.log('🎉 Ticket created successfully:', result.ticket);
-      navigate('/active-flags');
+      
+      // Switch to my-tickets tab to show the created ticket
+      setActiveTab('my-tickets');
       
     } catch (err: any) {
       console.error('❌ Error creating ticket:', err);
@@ -213,16 +275,31 @@ export function PeerMatching() {
     }
   };
 
+  const getTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const created = new Date(dateString);
+    const diffMs = now.getTime() - created.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
       <Navigation />
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl shadow-sm p-8"
+          className="bg-white rounded-3xl shadow-sm overflow-hidden"
         >
-          <div className="flex items-center space-x-4 mb-6">
+          {/* Header */}
+          <div className="flex items-center space-x-4 p-6 border-b border-gray-100">
             <Link
               to="/"
               className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all"
@@ -234,167 +311,444 @@ export function PeerMatching() {
                 <Users className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Get Support</h1>
-                <p className="text-sm text-gray-500">Create a flag to connect with peers</p>
+                <h1 className="text-xl font-semibold text-gray-900">Peer Matching</h1>
+                <p className="text-sm text-gray-500">Connect with others who understand</p>
               </div>
             </div>
           </div>
 
-          {/* My Tickets Section */}
-          <div className="mb-10">
-            <h2 className="text-lg font-semibold text-primary-700 mb-2">My Active Flags</h2>
-            {myTicketsLoading ? (
-              <div className="text-gray-500 py-4">Loading your tickets...</div>
-            ) : myTicketsError ? (
-              <div className="bg-red-100 text-red-700 rounded-xl p-3 text-sm mb-2">{myTicketsError}</div>
-            ) : myTickets.length === 0 ? (
-              <div className="text-gray-500 py-4">You have no active help tickets.</div>
-            ) : (
-              <div className="grid gap-4">
-                {myTickets.map(ticket => (
-                  <div key={ticket.id} className="border border-gray-100 rounded-xl p-4 bg-gradient-to-br from-primary-50 to-secondary-50">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="font-semibold text-primary-700">{ticket.display_name || 'Anonymous'}</span>
-                      {ticket.age_range && <span className="text-xs bg-primary-100 text-primary-700 rounded-full px-2 py-0.5 ml-2">{ticket.age_range}</span>}
-                      <span className="text-xs bg-secondary-100 text-secondary-700 rounded-full px-2 py-0.5 ml-2">{ticket.emotional_state}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mb-1">
-                      {ticket.need_tags && ticket.need_tags.map((tag: string) => (
-                        <span key={tag} className="text-xs bg-accent-100 text-accent-700 rounded-full px-2 py-0.5">{tag}</span>
-                      ))}
-                    </div>
-                    {ticket.details && ticket.details.extra && (
-                      <div className="text-sm text-gray-700 mb-1">{ticket.details.extra}</div>
-                    )}
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-xl text-xs font-medium transition-all disabled:opacity-60"
-                        onClick={() => handleWithdraw(ticket.id)}
-                        disabled={withdrawingId === ticket.id}
-                      >
-                        {withdrawingId === ticket.id ? 'Withdrawing...' : 'Withdraw'}
-                      </button>
-                    </div>
-
-                    {/* Incoming Match Requests Section */}
-                    <IncomingRequests ticketId={ticket.id} />
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 max-w-xl mx-auto">
-            {/* Display Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Display Name (Optional)</label>
-              <input
-                {...register('display_name')}
-                type="text"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                placeholder="How would you like to be called? (can be anonymous)"
-                autoComplete="off"
-              />
-            </div>
-
-            {/* Age Range */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Age Range <span className="text-error-500">*</span></label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {AGE_RANGES.map((range) => (
-                  <label key={range} className="cursor-pointer">
-                    <input
-                      {...register('age_range', { required: 'Please select your age range' })}
-                      type="radio"
-                      value={range}
-                      className="sr-only peer"
-                    />
-                    <div className="p-3 border border-gray-200 rounded-xl text-center hover:border-primary-300 peer-checked:border-primary-500 peer-checked:bg-primary-50 transition-all">
-                      <span className="text-sm font-medium">{range}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-              {errors.age_range && (
-                <p className="mt-1 text-sm text-error-500">{errors.age_range.message as string}</p>
-              )}
-            </div>
-
-            {/* Emotional State */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Emotional State <span className="text-error-500">*</span></label>
-              <select
-                {...register('emotional_state', { required: 'Please select your current emotional state' })}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                defaultValue=""
-              >
-                <option value="" disabled>Select your current emotional state</option>
-                {EMOTIONAL_STATES.map((state) => (
-                  <option key={state} value={state}>{state}</option>
-                ))}
-              </select>
-              {errors.emotional_state && (
-                <p className="mt-1 text-sm text-error-500">{errors.emotional_state.message as string}</p>
-              )}
-            </div>
-
-            {/* Need Tags */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">What do you need right now? <span className="text-error-500">*</span></label>
-              <div className="flex flex-wrap gap-2">
-                {NEED_TAGS.map((tag) => (
-                  <button
-                    type="button"
-                    key={tag}
-                    onClick={() => handleTagToggle(tag)}
-                    className={`px-4 py-2 rounded-full border text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 ${
-                      selectedTags.includes(tag)
-                        ? 'bg-primary-500 text-white border-primary-500'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-primary-50'
-                    }`}
-                    aria-pressed={selectedTags.includes(tag)}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-              {selectedTags.length === 0 && (
-                <p className="mt-1 text-sm text-error-500">Please select at least one need</p>
-              )}
-            </div>
-
-            {/* Details */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Anything else you'd like to share? (Optional)</label>
-              <textarea
-                {...register('details')}
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                rows={3}
-                placeholder="Share any context, preferences, or boundaries (optional)"
-              />
-            </div>
-
-            {/* Privacy/Consent Notice */}
-            <div className="bg-primary-50 rounded-xl p-4 text-xs text-gray-600 mb-2">
-              By creating a help ticket, you agree to share the above information with potential peer supporters. You can withdraw your ticket at any time. Your privacy and consent are always respected.
-            </div>
-
-            {/* Error Message */}
-            {error && (
-              <div className="bg-red-100 text-red-700 rounded-xl p-3 text-sm mb-2">{error}</div>
-            )}
-
-            {/* Submit Button */}
+          {/* Tab Navigation */}
+          <div className="flex border-b border-gray-100">
             <button
-              type="submit"
-              className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white py-4 px-6 rounded-2xl font-medium hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-60"
-              disabled={loading || selectedTags.length === 0}
+              onClick={() => setActiveTab('browse')}
+              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+                activeTab === 'browse'
+                  ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
             >
-              {loading ? 'Creating Ticket...' : 'Create Help Ticket'}
+              <div className="flex items-center justify-center space-x-2">
+                <Search className="w-4 h-4" />
+                <span>Browse Support Requests</span>
+              </div>
             </button>
-          </form>
+            <button
+              onClick={() => setActiveTab('create')}
+              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+                activeTab === 'create'
+                  ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <Heart className="w-4 h-4" />
+                <span>Request Support</span>
+              </div>
+            </button>
+            <button
+              onClick={() => setActiveTab('my-tickets')}
+              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
+                activeTab === 'my-tickets'
+                  ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <div className="flex items-center justify-center space-x-2">
+                <User className="w-4 h-4" />
+                <span>My Requests</span>
+              </div>
+            </button>
+          </div>
+
+          {/* Tab Content */}
+          <div className="p-6">
+            {/* Browse Tab */}
+            {activeTab === 'browse' && (
+              <div className="space-y-6">
+                {/* Filters */}
+                <div className="bg-gray-50 rounded-2xl p-4">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <Filter className="w-4 h-4 text-gray-600" />
+                    <h3 className="font-medium text-gray-900">Filter Support Requests</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <select
+                      value={filters.emotional_state}
+                      onChange={(e) => setFilters(prev => ({ ...prev, emotional_state: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                      <option value="">All Emotional States</option>
+                      {EMOTIONAL_STATES.map(state => (
+                        <option key={state} value={state}>{state}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={filters.need_tag}
+                      onChange={(e) => setFilters(prev => ({ ...prev, need_tag: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                      <option value="">All Support Types</option>
+                      {NEED_TAGS.map(tag => (
+                        <option key={tag} value={tag}>{tag}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={filters.age_range}
+                      onChange={(e) => setFilters(prev => ({ ...prev, age_range: e.target.value }))}
+                      className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                    >
+                      <option value="">All Age Ranges</option>
+                      {AGE_RANGES.map(range => (
+                        <option key={range} value={range}>{range}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Available Tickets */}
+                {browsing ? (
+                  <div className="flex justify-center py-12">
+                    <div className="text-gray-500">Loading support requests...</div>
+                  </div>
+                ) : browseError ? (
+                  <div className="bg-red-100 text-red-700 rounded-xl p-4 text-center">{browseError}</div>
+                ) : availableTickets.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-semibold">No support requests found</p>
+                    <p className="text-sm">Try adjusting your filters or check back later</p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {availableTickets.map(ticket => (
+                      <motion.div
+                        key={ticket.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="border border-gray-200 rounded-2xl p-6 hover:shadow-md transition-all"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-3">
+                              <span className="font-semibold text-gray-900 text-lg">
+                                {ticket.display_name || 'Anonymous'}
+                              </span>
+                              {ticket.age_range && (
+                                <span className="text-xs bg-primary-100 text-primary-700 rounded-full px-3 py-1">
+                                  {ticket.age_range}
+                                </span>
+                              )}
+                              <span className="text-xs bg-secondary-100 text-secondary-700 rounded-full px-3 py-1">
+                                {ticket.emotional_state}
+                              </span>
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Clock className="w-3 h-3 mr-1" />
+                                {getTimeAgo(ticket.created_at)}
+                              </div>
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {ticket.need_tags.map(tag => (
+                                <span key={tag} className="text-xs bg-accent-100 text-accent-700 rounded-full px-3 py-1">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                            
+                            {ticket.details && (
+                              <p className="text-sm text-gray-700 mb-4">{ticket.details}</p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <RequestToConnectButton ticketId={ticket.id} />
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Create Tab */}
+            {activeTab === 'create' && (
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 max-w-2xl mx-auto">
+                <div className="text-center mb-8">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Request Support</h2>
+                  <p className="text-gray-600">Let others know how they can help you today</p>
+                </div>
+
+                {/* Display Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Display Name (Optional)</label>
+                  <input
+                    {...register('display_name')}
+                    type="text"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    placeholder="How would you like to be called? (can be anonymous)"
+                    autoComplete="off"
+                  />
+                </div>
+
+                {/* Age Range */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Age Range <span className="text-error-500">*</span></label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {AGE_RANGES.map((range) => (
+                      <label key={range} className="cursor-pointer">
+                        <input
+                          {...register('age_range', { required: 'Please select your age range' })}
+                          type="radio"
+                          value={range}
+                          className="sr-only peer"
+                        />
+                        <div className="p-3 border border-gray-200 rounded-xl text-center hover:border-primary-300 peer-checked:border-primary-500 peer-checked:bg-primary-50 transition-all">
+                          <span className="text-sm font-medium">{range}</span>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  {errors.age_range && (
+                    <p className="mt-1 text-sm text-error-500">{errors.age_range.message as string}</p>
+                  )}
+                </div>
+
+                {/* Emotional State */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Emotional State <span className="text-error-500">*</span></label>
+                  <select
+                    {...register('emotional_state', { required: 'Please select your current emotional state' })}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    defaultValue=""
+                  >
+                    <option value="" disabled>Select your current emotional state</option>
+                    {EMOTIONAL_STATES.map((state) => (
+                      <option key={state} value={state}>{state}</option>
+                    ))}
+                  </select>
+                  {errors.emotional_state && (
+                    <p className="mt-1 text-sm text-error-500">{errors.emotional_state.message as string}</p>
+                  )}
+                </div>
+
+                {/* Need Tags */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">What do you need right now? <span className="text-error-500">*</span></label>
+                  <div className="flex flex-wrap gap-2">
+                    {NEED_TAGS.map((tag) => (
+                      <button
+                        type="button"
+                        key={tag}
+                        onClick={() => handleTagToggle(tag)}
+                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                          selectedTags.includes(tag)
+                            ? 'bg-primary-500 text-white border-primary-500'
+                            : 'bg-white text-gray-700 border-gray-200 hover:bg-primary-50'
+                        }`}
+                        aria-pressed={selectedTags.includes(tag)}
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                  {selectedTags.length === 0 && (
+                    <p className="mt-1 text-sm text-error-500">Please select at least one need</p>
+                  )}
+                </div>
+
+                {/* Details */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Anything else you'd like to share? (Optional)</label>
+                  <textarea
+                    {...register('details')}
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    rows={3}
+                    placeholder="Share any context, preferences, or boundaries (optional)"
+                  />
+                </div>
+
+                {/* Privacy/Consent Notice */}
+                <div className="bg-primary-50 rounded-xl p-4 text-xs text-gray-600 mb-2">
+                  By creating a support request, you agree to share the above information with potential peer supporters. You can withdraw your request at any time. Your privacy and consent are always respected.
+                </div>
+
+                {/* Error Message */}
+                {error && (
+                  <div className="bg-red-100 text-red-700 rounded-xl p-3 text-sm mb-2">{error}</div>
+                )}
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white py-4 px-6 rounded-2xl font-medium hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-60"
+                  disabled={loading || selectedTags.length === 0}
+                >
+                  {loading ? 'Creating Request...' : 'Create Support Request'}
+                </button>
+              </form>
+            )}
+
+            {/* My Tickets Tab */}
+            {activeTab === 'my-tickets' && (
+              <div className="space-y-6">
+                <div className="text-center mb-8">
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">My Support Requests</h2>
+                  <p className="text-gray-600">Manage your active requests and incoming connections</p>
+                </div>
+
+                {myTicketsLoading ? (
+                  <div className="flex justify-center py-12">
+                    <div className="text-gray-500">Loading your requests...</div>
+                  </div>
+                ) : myTicketsError ? (
+                  <div className="bg-red-100 text-red-700 rounded-xl p-4 text-center">{myTicketsError}</div>
+                ) : myTickets.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Heart className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="text-lg font-semibold">No active support requests</p>
+                    <p className="text-sm mb-4">Create a request to connect with supportive peers</p>
+                    <button
+                      onClick={() => setActiveTab('create')}
+                      className="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
+                    >
+                      Create Support Request
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid gap-6">
+                    {myTickets.map(ticket => (
+                      <div key={ticket.id} className="border border-gray-200 rounded-2xl p-6 bg-gradient-to-br from-primary-50 to-secondary-50">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-3">
+                              <span className="font-semibold text-primary-700 text-lg">
+                                {ticket.display_name || 'Anonymous'}
+                              </span>
+                              {ticket.age_range && (
+                                <span className="text-xs bg-primary-100 text-primary-700 rounded-full px-3 py-1">
+                                  {ticket.age_range}
+                                </span>
+                              )}
+                              <span className="text-xs bg-secondary-100 text-secondary-700 rounded-full px-3 py-1">
+                                {ticket.emotional_state}
+                              </span>
+                              <div className="flex items-center text-xs text-gray-500">
+                                <Clock className="w-3 h-3 mr-1" />
+                                {getTimeAgo(ticket.created_at)}
+                              </div>
+                            </div>
+                            
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {ticket.need_tags && ticket.need_tags.map((tag: string) => (
+                                <span key={tag} className="text-xs bg-accent-100 text-accent-700 rounded-full px-3 py-1">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                            
+                            {ticket.details && (
+                              <p className="text-sm text-gray-700 mb-4">{ticket.details}</p>
+                            )}
+                          </div>
+                          
+                          <button
+                            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-60"
+                            onClick={() => handleWithdraw(ticket.id)}
+                            disabled={withdrawingId === ticket.id}
+                          >
+                            {withdrawingId === ticket.id ? 'Withdrawing...' : 'Withdraw'}
+                          </button>
+                        </div>
+
+                        {/* Incoming Match Requests Section */}
+                        <IncomingRequests ticketId={ticket.id} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </motion.div>
       </div>
+    </div>
+  );
+}
+
+function RequestToConnectButton({ ticketId }: { ticketId: string }) {
+  const { user, profile } = useAuthStore();
+  const [loading, setLoading] = React.useState(false);
+  const [success, setSuccess] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [requested, setRequested] = React.useState(false);
+
+  const handleRequest = async () => {
+    setLoading(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
+      
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) throw new Error('Supabase URL not configured');
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/create-match-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ 
+          ticket_id: ticketId,
+          requester_display_name: profile?.display_name || 'Anonymous',
+          requester_need_tags: []
+        })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try { 
+          errorData = JSON.parse(errorText); 
+        } catch { 
+          errorData = { error: errorText }; 
+        }
+        throw new Error(errorData.error || `HTTP ${response.status} error`);
+      }
+      
+      const result = await response.json();
+      if (!result.match_request) {
+        throw new Error('Failed to create match request');
+      }
+      
+      setSuccess(true);
+      setRequested(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send request');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (requested) {
+    return <div className="text-green-600 text-sm font-medium">Request sent successfully!</div>;
+  }
+
+  return (
+    <div>
+      <button
+        className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-xl font-medium transition-all shadow-sm disabled:opacity-60"
+        onClick={handleRequest}
+        disabled={loading}
+      >
+        {loading ? 'Sending Request...' : 'Request to Connect'}
+      </button>
+      {error && (
+        <div className="mt-2 text-red-600 text-sm">{error}</div>
+      )}
+      {success && (
+        <div className="mt-2 text-green-600 text-sm">Request sent successfully!</div>
+      )}
     </div>
   );
 }
@@ -404,7 +758,7 @@ function IncomingRequests({ ticketId }: { ticketId: string }) {
   const [requests, setRequests] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [actionLoading, setActionLoading] = React.useState<string | null>(null); // requestId being acted on
+  const [actionLoading, setActionLoading] = React.useState<string | null>(null);
   const [actionError, setActionError] = React.useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = React.useState<string | null>(null);
 
@@ -415,8 +769,10 @@ function IncomingRequests({ ticketId }: { ticketId: string }) {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
+        
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         if (!supabaseUrl) throw new Error('Supabase URL not configured');
+        
         const response = await fetch(`${supabaseUrl}/functions/v1/list-match-requests?ticket_id=${ticketId}`, {
           method: 'GET',
           headers: {
@@ -424,12 +780,14 @@ function IncomingRequests({ ticketId }: { ticketId: string }) {
             'Content-Type': 'application/json'
           }
         });
+
         if (!response.ok) {
           const errorText = await response.text();
           let errorData;
           try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
           throw new Error(errorData.error || `HTTP ${response.status} error`);
         }
+
         const result = await response.json();
         if (!result.success) throw new Error(result.error || 'Failed to fetch match requests');
         setRequests(result.requests || []);
@@ -449,8 +807,10 @@ function IncomingRequests({ ticketId }: { ticketId: string }) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
+      
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) throw new Error('Supabase URL not configured');
+      
       const response = await fetch(`${supabaseUrl}/functions/v1/${action}-match-request`, {
         method: 'POST',
         headers: {
@@ -459,15 +819,18 @@ function IncomingRequests({ ticketId }: { ticketId: string }) {
         },
         body: JSON.stringify({ request_id: requestId })
       });
+
       if (!response.ok) {
         const errorText = await response.text();
         let errorData;
         try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
         throw new Error(errorData.error || `HTTP ${response.status} error`);
       }
+
       const result = await response.json();
       setActionSuccess(action === 'accept' ? 'Accepted!' : 'Declined');
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      
       // Redirect to chat if accepted and conversation_id is present
       if (action === 'accept' && result.conversation_id && navigate) {
         navigate(`/chat/${result.conversation_id}`);
@@ -480,33 +843,39 @@ function IncomingRequests({ ticketId }: { ticketId: string }) {
   };
 
   return (
-    <div className="mt-4">
-      <h4 className="text-sm font-semibold text-primary-600 mb-1">Incoming Match Requests</h4>
+    <div className="mt-6 pt-4 border-t border-gray-200">
+      <h4 className="text-sm font-semibold text-primary-600 mb-3">Incoming Connection Requests</h4>
       {loading ? (
         <div className="text-xs text-gray-500">Loading requests...</div>
       ) : error ? (
-        <div className="bg-red-100 text-red-700 rounded-xl p-2 text-xs mb-2">{error}</div>
+        <div className="bg-red-100 text-red-700 rounded-xl p-3 text-xs">{error}</div>
       ) : requests.length === 0 ? (
-        <div className="text-xs text-gray-500">No match requests yet.</div>
+        <div className="text-xs text-gray-500">No connection requests yet.</div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {requests.map((req) => (
-            <div key={req.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-3 py-2">
-              <div>
-                <span className="font-medium text-primary-700">{req.requester_display_name || 'Anonymous'}</span>
-                {req.requester_age_range && <span className="text-xs bg-primary-100 text-primary-700 rounded-full px-2 py-0.5 ml-2">{req.requester_age_range}</span>}
-                {req.requester_emotional_state && <span className="text-xs bg-secondary-100 text-secondary-700 rounded-full px-2 py-0.5 ml-2">{req.requester_emotional_state}</span>}
+            <div key={req.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2">
+                  <span className="font-medium text-primary-700">
+                    {req.requester_display_name || 'Anonymous'}
+                  </span>
+                  <span className="text-xs text-gray-500">wants to connect</span>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {new Date(req.created_at).toLocaleString()}
+                </div>
               </div>
               <div className="flex gap-2">
                 <button
-                  className="bg-success-500 hover:bg-success-600 text-white px-3 py-1 rounded-xl text-xs font-medium transition-all disabled:opacity-60"
+                  className="bg-success-500 hover:bg-success-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-60"
                   onClick={() => handleAction(req.id, 'accept')}
                   disabled={actionLoading === req.id}
                 >
                   {actionLoading === req.id ? 'Accepting...' : 'Accept'}
                 </button>
                 <button
-                  className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-1 rounded-xl text-xs font-medium transition-all disabled:opacity-60"
+                  className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-60"
                   onClick={() => handleAction(req.id, 'decline')}
                   disabled={actionLoading === req.id}
                 >
