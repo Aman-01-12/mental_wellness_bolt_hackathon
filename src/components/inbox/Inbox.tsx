@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { MessageCircle, ArrowLeft, Users } from 'lucide-react';
+import { MessageCircle, ArrowLeft, Users, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { useAuthStore } from '../../store/authStore';
@@ -21,7 +21,7 @@ interface Conversation {
 }
 
 export function Inbox() {
-  const { user } = useAuthStore();
+  const { user, initialized } = useAuthStore();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,15 +79,21 @@ export function Inbox() {
 
   // Initial fetch
   useEffect(() => {
-    if (!user) return;
+    if (!initialized) return;
+    
+    if (!user) {
+      setLoading(false);
+      setError('Please sign in to view your inbox');
+      return;
+    }
     
     setLoading(true);
     fetchConversations();
-  }, [user, fetchConversations]);
+  }, [user, initialized, fetchConversations]);
 
   // Realtime subscription management
   useEffect(() => {
-    if (!user) return;
+    if (!user || !initialized) return;
 
     // Set up realtime subscription for new messages
     const subscription = supabase
@@ -121,14 +127,40 @@ export function Inbox() {
     return () => {
       subscription.unsubscribe();
     };
-  }, [user, fetchConversations]);
+  }, [user, initialized, fetchConversations]);
 
+  // Show loading if auth is not initialized yet
+  if (!initialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+        <Navigation />
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
+            <LoadingSpinner size="large" />
+            <p className="mt-4 text-gray-600">Initializing...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show sign-in prompt if user is not authenticated
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Please sign in</h2>
-          <p className="text-gray-600">You need to be signed in to view your inbox.</p>
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+        <Navigation />
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
+            <AlertCircle className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Sign In Required</h2>
+            <p className="text-gray-600 mb-6">You need to be signed in to view your inbox.</p>
+            <Link
+              to="/auth"
+              className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
+            >
+              Sign In
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -171,6 +203,7 @@ export function Inbox() {
           {loading ? (
             <div className="flex justify-center py-12">
               <LoadingSpinner size="large" />
+              <p className="text-gray-500 ml-4">Loading conversations...</p>
             </div>
           ) : conversations.length === 0 ? (
             <div className="text-center py-12">

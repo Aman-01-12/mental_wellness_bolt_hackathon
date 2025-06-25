@@ -45,6 +45,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
+    console.log("🔐 Auth header received:", authHeader.substring(0, 20) + "...");
+
     // Create Supabase client with service role for database operations
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -65,9 +67,25 @@ Deno.serve(async (req: Request) => {
     );
 
     // Verify user authentication
+    console.log("🔍 Verifying user authentication...");
     const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
-    if (userError || !user) {
+    
+    if (userError) {
       console.error("❌ Authentication error:", userError);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: "Authentication failed: " + userError.message 
+      }), {
+        status: 401,
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders 
+        },
+      });
+    }
+
+    if (!user) {
+      console.error("❌ No user found in token");
       return new Response(JSON.stringify({ 
         success: false,
         error: "Invalid or expired authentication token" 
@@ -80,7 +98,7 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    console.log("✅ Edge Function: User authenticated:", user.id);
+    console.log("✅ User authenticated:", user.id);
 
     // Parse query params for filtering (optional)
     const url = new URL(req.url);
@@ -88,7 +106,7 @@ Deno.serve(async (req: Request) => {
     const need_tag = url.searchParams.get("need_tag");
     const age_range = url.searchParams.get("age_range");
 
-    console.log("🔍 Edge Function: Query filters:", { emotional_state, need_tag, age_range });
+    console.log("🔍 Query filters:", { emotional_state, need_tag, age_range });
 
     // Build query using admin client for reliable database access
     let query = supabaseAdmin
@@ -119,10 +137,11 @@ Deno.serve(async (req: Request) => {
       query = query.eq("age_range", age_range);
     }
 
+    console.log("📊 Executing database query...");
     const { data: tickets, error } = await query;
 
     if (error) {
-      console.error("❌ Edge Function: Database error:", error);
+      console.error("❌ Database error:", error);
       return new Response(JSON.stringify({ 
         success: false,
         error: `Failed to fetch tickets: ${error.message}`,
@@ -136,10 +155,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    console.log("📊 Edge Function: Raw tickets from database:", tickets?.length || 0);
-    console.log("📊 Edge Function: Sample tickets:", tickets?.slice(0, 2));
-    console.log("📊 Edge Function: User IDs in tickets:", tickets?.map(t => t.user_id));
-    console.log("📊 Edge Function: Current user ID:", user.id);
+    console.log("📊 Raw tickets from database:", tickets?.length || 0);
+    console.log("📊 Sample tickets:", tickets?.slice(0, 2));
 
     // Return ALL tickets - let the frontend filter out user's own tickets
     const result = {
@@ -153,7 +170,7 @@ Deno.serve(async (req: Request) => {
       }
     };
 
-    console.log("✅ Edge Function: Returning result:", result);
+    console.log("✅ Returning result with", result.tickets.length, "tickets");
 
     return new Response(JSON.stringify(result), {
       status: 200,
@@ -164,7 +181,7 @@ Deno.serve(async (req: Request) => {
     });
 
   } catch (error) {
-    console.error("❌ Edge Function: Unexpected error:", error);
+    console.error("❌ Unexpected error:", error);
     return new Response(JSON.stringify({ 
       success: false,
       error: "Internal server error",

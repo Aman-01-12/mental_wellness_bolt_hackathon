@@ -28,6 +28,7 @@ interface AuthState {
   profile: UserProfile | null
   session: Session | null
   loading: boolean
+  initialized: boolean
   error: string | null
   onboardingCompleted: boolean
   signIn: (email: string, password: string) => Promise<void>
@@ -44,6 +45,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   profile: null,
   session: null,
   loading: true,
+  initialized: false,
   error: null,
   onboardingCompleted: false,
 
@@ -121,7 +123,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         session: null, 
         loading: false,
         error: null,
-        onboardingCompleted: false
+        onboardingCompleted: false,
+        initialized: true
       })
     } catch (error: any) {
       // Even if signOut fails, clear local state
@@ -131,7 +134,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         session: null, 
         loading: false,
         error: null,
-        onboardingCompleted: false
+        onboardingCompleted: false,
+        initialized: true
       })
     }
   },
@@ -187,6 +191,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   initializeAuth: async () => {
     try {
+      console.log('🔐 Initializing auth...')
       set({ loading: true, error: null })
 
       // Get initial session
@@ -194,26 +199,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       if (error) {
         console.error('Session error:', error)
-        set({ user: null, profile: null, session: null, loading: false, error: null, onboardingCompleted: false })
+        set({ 
+          user: null, 
+          profile: null, 
+          session: null, 
+          loading: false, 
+          initialized: true,
+          error: null, 
+          onboardingCompleted: false 
+        })
         return
       }
+
+      console.log('📋 Initial session:', session ? 'Found' : 'None')
 
       set({ 
         user: session?.user ?? null, 
         session,
         loading: false,
+        initialized: true,
         error: null 
       })
 
       // Fetch profile if user exists
       if (session?.user) {
+        console.log('👤 Fetching user profile...')
         await get().fetchProfile()
       }
 
       // Listen for auth changes
       supabase.auth.onAuthStateChange(async (event, session) => {
         try {
-          console.log('Auth state changed:', event)
+          console.log('🔄 Auth state changed:', event)
           
           if (event === 'SIGNED_OUT') {
             set({ 
@@ -221,6 +238,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               profile: null, 
               session: null,
               loading: false,
+              initialized: true,
               error: null,
               onboardingCompleted: false
             })
@@ -229,6 +247,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
               user: session?.user ?? null, 
               session,
               loading: false,
+              initialized: true,
               error: null 
             })
             
@@ -239,7 +258,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           }
         } catch (error: any) {
           console.error('Auth state change error:', error)
-          set({ error: error.message, loading: false })
+          set({ error: error.message, loading: false, initialized: true })
         }
       })
 
@@ -250,6 +269,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         profile: null,
         session: null, 
         loading: false,
+        initialized: true,
         error: null, // Don't show initialization errors to user
         onboardingCompleted: false
       })

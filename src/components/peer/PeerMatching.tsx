@@ -5,6 +5,7 @@ import { Users, ArrowLeft, Heart, Clock, User } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { useAuthStore } from '../../store/authStore';
+import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { supabase } from '../../lib/supabase';
 
 const AGE_RANGES = [
@@ -30,7 +31,7 @@ interface FormData {
 
 export function PeerMatching() {
   const navigate = useNavigate();
-  const { profile } = useAuthStore();
+  const { profile, initialized } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'create' | 'my-tickets'>('create');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,12 +54,12 @@ export function PeerMatching() {
 
   const selectedTags = watch('need_tags') || [];
 
-  // Fetch my tickets
+  // Fetch my tickets when tab changes
   React.useEffect(() => {
-    if (activeTab === 'my-tickets') {
+    if (activeTab === 'my-tickets' && initialized) {
       fetchMyTickets();
     }
-  }, [activeTab]);
+  }, [activeTab, initialized]);
 
   const fetchMyTickets = async () => {
     setMyTicketsLoading(true);
@@ -214,6 +215,21 @@ export function PeerMatching() {
     if (diffHours < 24) return `${diffHours}h ago`;
     return `${diffDays}d ago`;
   };
+
+  // Show loading if auth is not initialized yet
+  if (!initialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+        <Navigation />
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
+            <LoadingSpinner size="large" />
+            <p className="mt-4 text-gray-600">Initializing...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
@@ -396,7 +412,14 @@ export function PeerMatching() {
                   className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white py-4 px-6 rounded-2xl font-medium hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-60"
                   disabled={loading || selectedTags.length === 0}
                 >
-                  {loading ? 'Creating Request...' : 'Create Support Request'}
+                  {loading ? (
+                    <>
+                      <LoadingSpinner size="small" color="white" />
+                      <span>Creating Request...</span>
+                    </>
+                  ) : (
+                    'Create Support Request'
+                  )}
                 </button>
               </form>
             )}
@@ -411,7 +434,8 @@ export function PeerMatching() {
 
                 {myTicketsLoading ? (
                   <div className="flex justify-center py-12">
-                    <div className="text-gray-500">Loading your requests...</div>
+                    <LoadingSpinner size="large" />
+                    <p className="text-gray-500 ml-4">Loading your requests...</p>
                   </div>
                 ) : myTicketsError ? (
                   <div className="bg-red-100 text-red-700 rounded-xl p-4 text-center">{myTicketsError}</div>
@@ -465,11 +489,18 @@ export function PeerMatching() {
                           </div>
                           
                           <button
-                            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-60"
+                            className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-60 flex items-center space-x-2"
                             onClick={() => handleWithdraw(ticket.id)}
                             disabled={withdrawingId === ticket.id}
                           >
-                            {withdrawingId === ticket.id ? 'Withdrawing...' : 'Withdraw'}
+                            {withdrawingId === ticket.id ? (
+                              <>
+                                <LoadingSpinner size="small" color="white" />
+                                <span>Withdrawing...</span>
+                              </>
+                            ) : (
+                              'Withdraw'
+                            )}
                           </button>
                         </div>
 
@@ -581,7 +612,10 @@ function IncomingRequests({ ticketId }: { ticketId: string }) {
     <div className="mt-6 pt-4 border-t border-gray-200">
       <h4 className="text-sm font-semibold text-primary-600 mb-3">Incoming Connection Requests</h4>
       {loading ? (
-        <div className="text-xs text-gray-500">Loading requests...</div>
+        <div className="flex items-center space-x-2 text-xs text-gray-500">
+          <LoadingSpinner size="small" color="gray" />
+          <span>Loading requests...</span>
+        </div>
       ) : error ? (
         <div className="bg-red-100 text-red-700 rounded-xl p-3 text-xs">{error}</div>
       ) : requests.length === 0 ? (
@@ -603,18 +637,32 @@ function IncomingRequests({ ticketId }: { ticketId: string }) {
               </div>
               <div className="flex gap-2">
                 <button
-                  className="bg-success-500 hover:bg-success-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-60"
+                  className="bg-success-500 hover:bg-success-600 text-white px-3 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-60 flex items-center space-x-1"
                   onClick={() => handleAction(req.id, 'accept')}
                   disabled={actionLoading === req.id}
                 >
-                  {actionLoading === req.id ? 'Accepting...' : 'Accept'}
+                  {actionLoading === req.id ? (
+                    <>
+                      <LoadingSpinner size="small" color="white" />
+                      <span>Accepting...</span>
+                    </>
+                  ) : (
+                    'Accept'
+                  )}
                 </button>
                 <button
-                  className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-60"
+                  className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-1 rounded-lg text-xs font-medium transition-all disabled:opacity-60 flex items-center space-x-1"
                   onClick={() => handleAction(req.id, 'decline')}
                   disabled={actionLoading === req.id}
                 >
-                  {actionLoading === req.id ? 'Declining...' : 'Decline'}
+                  {actionLoading === req.id ? (
+                    <>
+                      <LoadingSpinner size="small" color="gray" />
+                      <span>Declining...</span>
+                    </>
+                  ) : (
+                    'Decline'
+                  )}
                 </button>
               </div>
             </div>

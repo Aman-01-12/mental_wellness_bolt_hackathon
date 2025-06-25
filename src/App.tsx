@@ -12,7 +12,7 @@ import { Inbox } from './components/inbox/Inbox';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 
 function App() {
-  const { user, loading, onboardingCompleted, initializeAuth } = useAuthStore();
+  const { user, loading, initialized, onboardingCompleted, initializeAuth } = useAuthStore();
 
   // Initialize auth on app start
   useEffect(() => {
@@ -20,7 +20,7 @@ function App() {
   }, [initializeAuth]);
 
   // Show loading spinner while initializing
-  if (loading) {
+  if (!initialized || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 flex items-center justify-center">
         <div className="text-center">

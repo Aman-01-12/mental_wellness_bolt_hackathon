@@ -33,7 +33,7 @@ interface Ticket {
 }
 
 export function ActiveFlags() {
-  const { user, profile } = useAuthStore();
+  const { user, profile, initialized } = useAuthStore();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [allTickets, setAllTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,14 +46,14 @@ export function ActiveFlags() {
   });
 
   useEffect(() => {
-    // Only fetch tickets if user is authenticated
-    if (user?.id) {
+    // Only fetch tickets if auth is initialized and user is authenticated
+    if (initialized && user?.id) {
       fetchTickets();
-    } else {
+    } else if (initialized && !user) {
       setLoading(false);
       setError('Please sign in to view support requests');
     }
-  }, [user?.id]); // Include user?.id in dependency array
+  }, [user?.id, initialized]);
 
   useEffect(() => {
     applyFilters();
@@ -71,7 +71,6 @@ export function ActiveFlags() {
     
     try {
       console.log('🎫 Starting ticket fetch process...');
-      console.log('🔑 Current user ID:', user?.id);
       
       // Get the auth token from Supabase session
       const { data: { session } } = await supabase.auth.getSession();
@@ -79,35 +78,16 @@ export function ActiveFlags() {
         throw new Error('No authentication session found. Please sign in again.');
       }
 
-      console.log('🔐 Auth token exists:', !!session.access_token);
+      console.log('🔐 Auth token exists');
 
-      // Call the Edge Function with proper URL
+      // Call the Edge Function
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) {
         throw new Error('Supabase URL not configured');
       }
 
-      console.log('🌐 Supabase URL:', supabaseUrl);
-
-      // First, let's try to fetch directly from the database to see what's there
-      console.log('🔍 Fetching tickets directly from database...');
-      const { data: directTickets, error: directError } = await supabase
-        .from('tickets')
-        .select('*')
-        .eq('status', 'open')
-        .order('created_at', { ascending: false });
-
-      if (directError) {
-        console.error('❌ Direct database query error:', directError);
-      } else {
-        console.log('📊 Direct database results:', directTickets);
-        console.log('📊 Total tickets in database:', directTickets?.length || 0);
-        console.log('📊 User IDs in tickets:', directTickets?.map(t => t.user_id));
-      }
-
-      // Now try the edge function
       const url = `${supabaseUrl}/functions/v1/list-tickets`;
-      console.log('📡 Calling Edge Function URL:', url);
+      console.log('📡 Calling Edge Function:', url);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -118,7 +98,6 @@ export function ActiveFlags() {
       });
 
       console.log('📡 Response status:', response.status);
-      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -131,66 +110,11 @@ export function ActiveFlags() {
           errorData = { error: errorText || `HTTP ${response.status} error` };
         }
         
-        // If it's an auth error, try to refresh the session
-        if (response.status === 401) {
-          console.log('🔄 Attempting to refresh session...');
-          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-          
-          if (refreshError || !refreshData.session) {
-            throw new Error('Session expired. Please sign in again.');
-          }
-          
-          // Retry with new token
-          const retryResponse = await fetch(url, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${refreshData.session.access_token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-          
-          if (!retryResponse.ok) {
-            const retryErrorText = await retryResponse.text();
-            let retryErrorData;
-            try {
-              retryErrorData = JSON.parse(retryErrorText);
-            } catch {
-              retryErrorData = { error: retryErrorText || `HTTP ${retryResponse.status} error` };
-            }
-            throw new Error(retryErrorData.error || `Server error: ${retryResponse.status}`);
-          }
-          
-          const retryResponseText = await retryResponse.text();
-          console.log('📡 Retry response:', retryResponseText);
-          
-          if (!retryResponseText) {
-            throw new Error('Empty response from server');
-          }
-          
-          let retryResult;
-          try {
-            retryResult = JSON.parse(retryResponseText);
-          } catch (parseError) {
-            console.error('❌ JSON Parse Error on retry:', parseError);
-            throw new Error('Invalid response format from server');
-          }
-          
-          if (!retryResult.success) {
-            throw new Error(retryResult.error || 'Failed to fetch tickets');
-          }
-          
-          // Store all tickets for filtering
-          const rawTickets = retryResult.tickets || [];
-          setAllTickets(rawTickets);
-          console.log('🎉 All tickets stored after retry:', rawTickets.length);
-          return;
-        }
-        
         throw new Error(errorData.error || `Server error: ${response.status}`);
       }
 
       const responseText = await response.text();
-      console.log('📡 Raw response:', responseText);
+      console.log('📡 Raw response length:', responseText.length);
 
       if (!responseText) {
         throw new Error('Empty response from server');
@@ -201,7 +125,6 @@ export function ActiveFlags() {
         result = JSON.parse(responseText);
       } catch (parseError) {
         console.error('❌ JSON Parse Error:', parseError);
-        console.error('❌ Response text:', responseText);
         throw new Error('Invalid response format from server');
       }
 
@@ -210,9 +133,6 @@ export function ActiveFlags() {
       if (!result.success) {
         throw new Error(result.error || 'Failed to fetch tickets');
       }
-
-      console.log('📊 Raw tickets from API:', result.tickets);
-      console.log('📊 Number of tickets from API:', result.tickets?.length || 0);
 
       // Store all tickets for filtering
       const rawTickets = result.tickets || [];
@@ -230,7 +150,6 @@ export function ActiveFlags() {
 
   const applyFilters = () => {
     console.log('🔍 Applying filters to', allTickets.length, 'tickets');
-    console.log('🔍 Current user ID for filtering:', user?.id);
     
     let filteredTickets = [...allTickets];
 
@@ -238,7 +157,6 @@ export function ActiveFlags() {
     const beforeOwnFilter = filteredTickets.length;
     filteredTickets = filteredTickets.filter((ticket: Ticket) => {
       const isOwnTicket = ticket.user_id === user?.id;
-      console.log(`🔍 Ticket ${ticket.id}: user_id=${ticket.user_id}, current_user=${user?.id}, isOwn=${isOwnTicket}`);
       return !isOwnTicket;
     });
     console.log(`🚫 After filtering out own tickets: ${beforeOwnFilter} -> ${filteredTickets.length}`);
@@ -249,7 +167,7 @@ export function ActiveFlags() {
       filteredTickets = filteredTickets.filter((ticket: Ticket) => 
         ticket.emotional_state === filters.emotional_state
       );
-      console.log(`😊 After emotion filter (${filters.emotional_state}): ${beforeEmotionFilter} -> ${filteredTickets.length}`);
+      console.log(`😊 After emotion filter: ${beforeEmotionFilter} -> ${filteredTickets.length}`);
     }
 
     // Apply need tag filter
@@ -258,7 +176,7 @@ export function ActiveFlags() {
       filteredTickets = filteredTickets.filter((ticket: Ticket) => 
         ticket.need_tags?.includes(filters.need_tag)
       );
-      console.log(`🏷️ After need filter (${filters.need_tag}): ${beforeNeedFilter} -> ${filteredTickets.length}`);
+      console.log(`🏷️ After need filter: ${beforeNeedFilter} -> ${filteredTickets.length}`);
     }
 
     // Apply age range filter
@@ -267,7 +185,7 @@ export function ActiveFlags() {
       filteredTickets = filteredTickets.filter((ticket: Ticket) => 
         ticket.age_range === filters.age_range
       );
-      console.log(`👥 After age filter (${filters.age_range}): ${beforeAgeFilter} -> ${filteredTickets.length}`);
+      console.log(`👥 After age filter: ${beforeAgeFilter} -> ${filteredTickets.length}`);
     }
 
     // Apply search filter
@@ -280,7 +198,7 @@ export function ActiveFlags() {
         ticket.need_tags?.some(tag => tag.toLowerCase().includes(searchLower)) ||
         (typeof ticket.details === 'string' && ticket.details.toLowerCase().includes(searchLower))
       );
-      console.log(`🔍 After search filter (${filters.search}): ${beforeSearchFilter} -> ${filteredTickets.length}`);
+      console.log(`🔍 After search filter: ${beforeSearchFilter} -> ${filteredTickets.length}`);
     }
 
     console.log('🎉 Final filtered tickets:', filteredTickets.length);
@@ -311,6 +229,21 @@ export function ActiveFlags() {
   };
 
   const hasActiveFilters = filters.emotional_state || filters.need_tag || filters.age_range || filters.search;
+
+  // Show loading if auth is not initialized yet
+  if (!initialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+        <Navigation />
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
+            <LoadingSpinner size="large" />
+            <p className="mt-4 text-gray-600">Initializing...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show sign-in prompt if user is not authenticated
   if (!user) {
@@ -470,24 +403,6 @@ export function ActiveFlags() {
               </div>
             )}
           </div>
-
-          {/* Debug Info */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="p-4 bg-yellow-50 border-b border-yellow-200">
-              <div className="text-xs text-yellow-800 space-y-1">
-                <div><strong>Debug Info:</strong></div>
-                <div>User ID: {user?.id}</div>
-                <div>Loading: {loading.toString()}</div>
-                <div>Error: {error || 'None'}</div>
-                <div>All Tickets: {allTickets.length}</div>
-                <div>Filtered Tickets: {tickets.length}</div>
-                <div>Has Active Filters: {hasActiveFilters.toString()}</div>
-                {allTickets.length > 0 && (
-                  <div>Sample Ticket User IDs: {allTickets.slice(0, 3).map(t => t.user_id).join(', ')}</div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Results */}
           <div className="p-6">
@@ -659,8 +574,8 @@ function RequestToConnectButton({ ticketId }: { ticketId: string }) {
       }
       
       const result = await response.json();
-      if (!result.match_request) {
-        throw new Error('Failed to create match request');
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create match request');
       }
       
       setSuccess(true);
