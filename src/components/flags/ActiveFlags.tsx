@@ -18,7 +18,7 @@ interface Ticket {
 }
 
 export function ActiveFlags() {
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -188,7 +188,7 @@ export function ActiveFlags() {
 }
 
 function RequestToConnectButton({ ticketId }: { ticketId: string }) {
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const [loading, setLoading] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
@@ -202,8 +202,10 @@ function RequestToConnectButton({ ticketId }: { ticketId: string }) {
       // Get auth token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
+      
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) throw new Error('Supabase URL not configured');
+      
       // Call Edge Function to create match request
       const response = await fetch(`${supabaseUrl}/functions/v1/create-match-request`, {
         method: 'POST',
@@ -211,14 +213,29 @@ function RequestToConnectButton({ ticketId }: { ticketId: string }) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ ticket_id: ticketId })
+        body: JSON.stringify({ 
+          ticket_id: ticketId,
+          requester_display_name: profile?.display_name || 'Anonymous',
+          requester_need_tags: [] // Could be enhanced to include user's needs
+        })
       });
+      
       if (!response.ok) {
         const errorText = await response.text();
         let errorData;
-        try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
+        try { 
+          errorData = JSON.parse(errorText); 
+        } catch { 
+          errorData = { error: errorText }; 
+        }
         throw new Error(errorData.error || `HTTP ${response.status} error`);
       }
+      
+      const result = await response.json();
+      if (!result.match_request) {
+        throw new Error('Failed to create match request');
+      }
+      
       setSuccess(true);
       setRequested(true);
     } catch (err: any) {
@@ -233,12 +250,20 @@ function RequestToConnectButton({ ticketId }: { ticketId: string }) {
   }
 
   return (
-    <button
-      className="mt-2 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-xl font-medium transition-all shadow-sm disabled:opacity-60"
-      onClick={handleRequest}
-      disabled={loading}
-    >
-      {loading ? 'Requesting...' : 'Request to Connect'}
-    </button>
+    <div className="mt-3">
+      <button
+        className="bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-xl font-medium transition-all shadow-sm disabled:opacity-60"
+        onClick={handleRequest}
+        disabled={loading}
+      >
+        {loading ? 'Sending Request...' : 'Request to Connect'}
+      </button>
+      {error && (
+        <div className="mt-2 text-red-600 text-sm">{error}</div>
+      )}
+      {success && (
+        <div className="mt-2 text-green-600 text-sm">Request sent successfully!</div>
+      )}
+    </div>
   );
 }
