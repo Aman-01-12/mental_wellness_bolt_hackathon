@@ -67,7 +67,7 @@ class AIService {
   private userProfiles: Map<string, UserProfileContext> = new Map();
 
   constructor() {
-    this.apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+    this.apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     if (!this.apiKey) {
       throw new Error('Google Gemini API key is not configured');
     }
