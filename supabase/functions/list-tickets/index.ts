@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "npm:@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -30,19 +29,13 @@ serve(async (req: Request) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: req.headers.get("Authorization")! } } }
-    );
-
-    // Get user ID from JWT for debugging
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      console.error("Authentication error:", userError);
+    // Get the authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("❌ No authorization header provided");
       return new Response(JSON.stringify({ 
         success: false,
-        error: "Unauthorized - please sign in again" 
+        error: "No authorization token provided" 
       }), {
         status: 401,
         headers: { 
@@ -52,7 +45,42 @@ serve(async (req: Request) => {
       });
     }
 
-    console.log("🔍 Edge Function: Fetching tickets for user:", user.id);
+    // Create Supabase client with service role for database operations
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Create client with user token for auth verification
+    const supabaseUser = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { 
+        global: { 
+          headers: { 
+            Authorization: authHeader 
+          } 
+        } 
+      }
+    );
+
+    // Verify user authentication
+    const { data: { user }, error: userError } = await supabaseUser.auth.getUser();
+    if (userError || !user) {
+      console.error("❌ Authentication error:", userError);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: "Invalid or expired authentication token" 
+      }), {
+        status: 401,
+        headers: { 
+          "Content-Type": "application/json",
+          ...corsHeaders 
+        },
+      });
+    }
+
+    console.log("✅ Edge Function: User authenticated:", user.id);
 
     // Parse query params for filtering (optional)
     const url = new URL(req.url);
@@ -62,8 +90,8 @@ serve(async (req: Request) => {
 
     console.log("🔍 Edge Function: Query filters:", { emotional_state, need_tag, age_range });
 
-    // Build query - fetch ALL open tickets (don't filter by user here, let frontend handle it)
-    let query = supabase
+    // Build query using admin client for reliable database access
+    let query = supabaseAdmin
       .from("tickets")
       .select(`
         id,

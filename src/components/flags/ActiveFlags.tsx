@@ -46,14 +46,26 @@ export function ActiveFlags() {
   });
 
   useEffect(() => {
-    fetchTickets();
-  }, []);
+    // Only fetch tickets if user is authenticated
+    if (user?.id) {
+      fetchTickets();
+    } else {
+      setLoading(false);
+      setError('Please sign in to view support requests');
+    }
+  }, [user?.id]); // Include user?.id in dependency array
 
   useEffect(() => {
     applyFilters();
   }, [filters, allTickets]);
 
   const fetchTickets = async () => {
+    if (!user?.id) {
+      setError('Please sign in to view support requests');
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     
@@ -117,6 +129,61 @@ export function ActiveFlags() {
           errorData = JSON.parse(errorText);
         } catch {
           errorData = { error: errorText || `HTTP ${response.status} error` };
+        }
+        
+        // If it's an auth error, try to refresh the session
+        if (response.status === 401) {
+          console.log('🔄 Attempting to refresh session...');
+          const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+          
+          if (refreshError || !refreshData.session) {
+            throw new Error('Session expired. Please sign in again.');
+          }
+          
+          // Retry with new token
+          const retryResponse = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${refreshData.session.access_token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          
+          if (!retryResponse.ok) {
+            const retryErrorText = await retryResponse.text();
+            let retryErrorData;
+            try {
+              retryErrorData = JSON.parse(retryErrorText);
+            } catch {
+              retryErrorData = { error: retryErrorText || `HTTP ${retryResponse.status} error` };
+            }
+            throw new Error(retryErrorData.error || `Server error: ${retryResponse.status}`);
+          }
+          
+          const retryResponseText = await retryResponse.text();
+          console.log('📡 Retry response:', retryResponseText);
+          
+          if (!retryResponseText) {
+            throw new Error('Empty response from server');
+          }
+          
+          let retryResult;
+          try {
+            retryResult = JSON.parse(retryResponseText);
+          } catch (parseError) {
+            console.error('❌ JSON Parse Error on retry:', parseError);
+            throw new Error('Invalid response format from server');
+          }
+          
+          if (!retryResult.success) {
+            throw new Error(retryResult.error || 'Failed to fetch tickets');
+          }
+          
+          // Store all tickets for filtering
+          const rawTickets = retryResult.tickets || [];
+          setAllTickets(rawTickets);
+          console.log('🎉 All tickets stored after retry:', rawTickets.length);
+          return;
         }
         
         throw new Error(errorData.error || `Server error: ${response.status}`);
@@ -244,6 +311,28 @@ export function ActiveFlags() {
   };
 
   const hasActiveFilters = filters.emotional_state || filters.need_tag || filters.age_range || filters.search;
+
+  // Show sign-in prompt if user is not authenticated
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+        <Navigation />
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
+            <AlertCircle className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Sign In Required</h2>
+            <p className="text-gray-600 mb-6">Please sign in to view active support requests</p>
+            <Link
+              to="/auth"
+              className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
+            >
+              Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
