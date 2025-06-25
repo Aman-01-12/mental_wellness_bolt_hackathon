@@ -97,7 +97,7 @@ export function AIChatInterface() {
         emotionAnalysis = await emotionService.analyzeEmotion(message);
         setMessages(prev => prev.map(msg => 
           msg.id === userMessage.id 
-            ? { ...msg, emotionAnalysis }
+            ? { ...msg, emotionAnalysis: emotionAnalysis || undefined }
             : msg
         ));
         if (emotionAnalysis) {
@@ -241,6 +241,50 @@ export function AIChatInterface() {
                 </motion.div>
               ))}
             </AnimatePresence>
+            <div ref={messagesEndRef} />
+          </div>
+          {/* Input Form */}
+          <div className="border-t border-gray-100 p-6">
+            <form onSubmit={handleSubmit} className="flex space-x-4">
+              <div className="flex-1 relative">
+                <textarea
+                  ref={inputRef}
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  placeholder="Share what's on your mind... Alex will respond with genuine care 💙"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors resize-none"
+                  rows={1}
+                  style={{
+                    minHeight: '48px',
+                    maxHeight: '120px',
+                    height: 'auto'
+                  }}
+                  onInput={(e) => {
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
+                  }}
+                />
+              </div>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                type="submit"
+                disabled={!inputValue.trim() || isLoading || isAnalyzingEmotion}
+                className="px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-2xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+              >
+                {(isLoading || isAnalyzingEmotion) ? (
+                  <LoadingSpinner size="small" color="white" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+                <span>Send</span>
+              </motion.button>
+            </form>
+            <p className="text-xs text-gray-500 mt-3 text-center">
+              Press Enter to send, Shift+Enter for new line. Alex analyzes your emotions to offer better support.
+            </p>
           </div>
         </div>
       </div>
