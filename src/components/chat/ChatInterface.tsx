@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, ArrowLeft, Send, RotateCcw, AlertCircle, Heart, Sparkles } from 'lucide-react';
+import { Bot, ArrowLeft, Send, RotateCcw, AlertCircle, Heart, Sparkles, Brain } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 import { aiService, type ChatMessage } from '../../services/aiService';
+import { emotionService, type EmotionAnalysis } from '../../services/emotionService';
+import { useEmotionalAssessment } from '../../hooks/useEmotionalAssessment';
+import { EmotionAssessmentModal } from './EmotionAssessmentModal';
 
 interface Message {
   id: string;
@@ -12,6 +15,7 @@ interface Message {
   content: string;
   timestamp: Date;
   isTyping?: boolean;
+  emotionAnalysis?: EmotionAnalysis;
 }
 
 export function ChatInterface() {
@@ -20,8 +24,19 @@ export function ChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
+  const [isAnalyzingEmotion, setIsAnalyzingEmotion] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Emotional assessment hook
+  const { 
+    shouldShowAssessment, 
+    assessmentType, 
+    currentAssessment, 
+    triggerAssessment, 
+    dismissAssessment,
+    resetAssessmentHistory 
+  } = useEmotionalAssessment();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -75,6 +90,33 @@ export function ChatInterface() {
     setMessages(prev => [...prev, typingMessage]);
 
     try {
+      // Analyze emotion first
+      console.log('🧠 Starting emotion analysis...');
+      setIsAnalyzingEmotion(true);
+      
+      let emotionAnalysis: EmotionAnalysis | null = null;
+      try {
+        emotionAnalysis = await emotionService.analyzeEmotion(message);
+        console.log('✅ Emotion analysis complete:', emotionAnalysis);
+        
+        // Update user message with emotion analysis
+        setMessages(prev => prev.map(msg => 
+          msg.id === userMessage.id 
+            ? { ...msg, emotionAnalysis }
+            : msg
+        ));
+
+        // Trigger assessment if needed
+        if (emotionAnalysis) {
+          triggerAssessment(emotionAnalysis);
+        }
+      } catch (emotionError) {
+        console.error('❌ Emotion analysis failed:', emotionError);
+        // Continue with AI response even if emotion analysis fails
+      } finally {
+        setIsAnalyzingEmotion(false);
+      }
+
       // Prepare conversation history for AI
       const conversationHistory: ChatMessage[] = messages
         .filter(msg => !msg.isTyping)
@@ -121,6 +163,7 @@ export function ChatInterface() {
       setMessages(prev => [...prev, errorChatMessage]);
     } finally {
       setIsLoading(false);
+      setIsAnalyzingEmotion(false);
     }
   };
 
@@ -134,6 +177,7 @@ export function ChatInterface() {
   const handleClearChat = () => {
     setMessages([]);
     setError(null);
+    resetAssessmentHistory();
     
     // Add welcome message back
     const welcomeMessage: Message = {
@@ -143,6 +187,15 @@ export function ChatInterface() {
       timestamp: new Date()
     };
     setMessages([welcomeMessage]);
+  };
+
+  const handleContinueWithAI = () => {
+    dismissAssessment();
+  };
+
+  const handleFindPeerSupport = () => {
+    dismissAssessment();
+    // The modal will handle navigation to peer matching
   };
 
   return (
@@ -167,7 +220,7 @@ export function ChatInterface() {
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center relative">
                   <Bot className="w-6 h-6 text-white" />
-                  {isTyping && (
+                  {(isTyping || isAnalyzingEmotion) && (
                     <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                   )}
                 </div>
@@ -177,7 +230,9 @@ export function ChatInterface() {
                     <Sparkles className="w-4 h-4 text-primary-500" />
                   </h1>
                   <p className="text-sm text-gray-500">
-                    {isTyping ? 'Thinking...' : 'Your gentle AI companion • Powered by Gemini'}
+                    {isAnalyzingEmotion ? 'Understanding your emotions...' :
+                     isTyping ? 'Thinking...' : 
+                     'Your gentle AI companion • Powered by Gemini'}
                   </p>
                 </div>
               </div>
@@ -234,7 +289,9 @@ export function ChatInterface() {
                       {message.isTyping ? (
                         <div className="flex items-center space-x-2">
                           <LoadingSpinner size="small" />
-                          <span className="text-sm">Thinking about what you shared...</span>
+                          <span className="text-sm">
+                            {isAnalyzingEmotion ? 'Understanding your emotions...' : 'Thinking about what you shared...'}
+                          </span>
                         </div>
                       ) : (
                         <p className="text-sm leading-relaxed whitespace-pre-wrap">
@@ -250,6 +307,17 @@ export function ChatInterface() {
                           minute: '2-digit' 
                         })}
                       </span>
+                      
+                      {message.emotionAnalysis && (
+                        <div className={`flex items-center space-x-1 text-xs ${emotionService.getEmotionColor(message.emotionAnalysis.primary_emotion)}`}>
+                          <Brain className="w-3 h-3" />
+                          <span>{emotionService.getEmotionEmoji(message.emotionAnalysis.primary_emotion)}</span>
+                          <span className="capitalize">{message.emotionAnalysis.primary_emotion}</span>
+                          <span className="text-gray-400">
+                            ({Math.round(message.emotionAnalysis.confidence * 100)}%)
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.div>
@@ -300,10 +368,10 @@ export function ChatInterface() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 type="submit"
-                disabled={!inputValue.trim() || isLoading}
+                disabled={!inputValue.trim() || isLoading || isAnalyzingEmotion}
                 className="px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-2xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
               >
-                {isLoading ? (
+                {(isLoading || isAnalyzingEmotion) ? (
                   <LoadingSpinner size="small" color="white" />
                 ) : (
                   <Send className="w-4 h-4" />
@@ -313,7 +381,7 @@ export function ChatInterface() {
             </form>
             
             <p className="text-xs text-gray-500 mt-3 text-center">
-              Press Enter to send, Shift+Enter for new line. Alex is powered by Google Gemini AI.
+              Press Enter to send, Shift+Enter for new line. Alex analyzes your emotions to offer better support.
             </p>
           </div>
         </div>
@@ -336,6 +404,18 @@ export function ChatInterface() {
           </div>
         </motion.div>
       </div>
+
+      {/* Emotion Assessment Modal */}
+      {shouldShowAssessment && currentAssessment && assessmentType && (
+        <EmotionAssessmentModal
+          isOpen={shouldShowAssessment}
+          onClose={dismissAssessment}
+          emotionAnalysis={currentAssessment}
+          assessmentType={assessmentType}
+          onContinueWithAI={handleContinueWithAI}
+          onFindPeerSupport={handleFindPeerSupport}
+        />
+      )}
     </div>
   );
 }

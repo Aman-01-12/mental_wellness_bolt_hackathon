@@ -37,14 +37,15 @@ export function useEmotionalAssessment(): UseEmotionalAssessmentReturn {
       return;
     }
 
-    const { mental_health_indicators, primary_emotion } = emotionAnalysis;
+    const { mental_health_indicators, primary_emotion, fuzzy_indicators } = emotionAnalysis;
     
     // Crisis detection - immediate trigger
     const isCrisis = 
       mental_health_indicators.anxiety_level > 0.8 ||
       mental_health_indicators.depression_level > 0.8 ||
       (mental_health_indicators.anxiety_level > 0.6 && mental_health_indicators.depression_level > 0.6) ||
-      ['hopeless', 'suicidal', 'desperate'].includes(primary_emotion);
+      ['hopeless', 'suicidal', 'desperate'].includes(primary_emotion) ||
+      (fuzzy_indicators?.emotional_stability < 0.2 && mental_health_indicators.stress_level > 0.7);
 
     if (isCrisis) {
       setAssessmentType('crisis');
@@ -59,13 +60,14 @@ export function useEmotionalAssessment(): UseEmotionalAssessmentReturn {
       return;
     }
 
-    // Initial assessment - show after first message with significant emotional content
+    // Initial assessment - show after first message with significant emotional content or support seeking
     if (!hasShownInitialRef.current && messageCountRef.current >= 1) {
       const hasSignificantEmotion = 
         mental_health_indicators.anxiety_level > 0.4 ||
         mental_health_indicators.depression_level > 0.4 ||
         mental_health_indicators.stress_level > 0.4 ||
-        emotionAnalysis.confidence > 0.6;
+        emotionAnalysis.confidence > 0.6 ||
+        fuzzy_indicators?.support_seeking_behavior > 0.5;
 
       if (hasSignificantEmotion) {
         hasShownInitialRef.current = true;
@@ -98,11 +100,15 @@ export function useEmotionalAssessment(): UseEmotionalAssessmentReturn {
         const avgStress = recentAssessments.reduce((sum, a) => 
           sum + a.emotionAnalysis.mental_health_indicators.stress_level, 0) / recentAssessments.length;
 
+        const avgStability = recentAssessments.reduce((sum, a) => 
+          sum + (a.emotionAnalysis.fuzzy_indicators?.emotional_stability || 0.5), 0) / recentAssessments.length;
+
         // Persistent moderate levels across multiple messages
         const isPersistent = 
           (avgAnxiety > 0.5 && avgAnxiety < 0.8) ||
           (avgDepression > 0.5 && avgDepression < 0.8) ||
-          (avgStress > 0.6);
+          (avgStress > 0.6) ||
+          (avgStability < 0.4);
 
         if (isPersistent) {
           setAssessmentType('persistent');

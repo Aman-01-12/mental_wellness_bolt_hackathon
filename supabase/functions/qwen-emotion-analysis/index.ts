@@ -46,7 +46,7 @@ async function analyzeEmotionWithQwen(text: string): Promise<EmotionAnalysis> {
   console.log('🧠 Performing human-like fuzzy emotion analysis with Qwen...');
   
   // Enhanced prompt for human-like emotional understanding
-  const prompt = `You are an advanced emotional intelligence AI that understands emotions like a seasoned human psychologist. Your analysis goes beyond keywords to understand the deeper emotional landscape, using fuzzy logic and human-like reasoning.
+  const prompt = `You are an advanced emotional intelligence AI that understands emotions like a seasoned human psychologist. Your task is to analyze text using fuzzy logic and human-like reasoning, not just keyword matching.
 
 HUMAN-LIKE EMOTIONAL UNDERSTANDING PRINCIPLES:
 - Emotions are complex, layered, and often contradictory
@@ -90,21 +90,13 @@ ADVANCED ANALYSIS REQUIREMENTS:
    - What would a caring friend notice?
    - What would an experienced therapist pick up on?
    - What emotional themes are emerging?
-   - What strengths and resources are present?
+   - What growth or healing opportunities exist?
 
-EXAMPLES OF HUMAN-LIKE REASONING:
-
-Text: "I'm fine, just tired"
-Human Analysis: Likely minimizing emotional distress; "tired" might indicate emotional exhaustion rather than physical fatigue; "fine" often masks deeper struggles
-
-Text: "Everything's going great! Super busy with work and stuff"
-Human Analysis: Forced positivity possible; using busyness as emotional avoidance; exclamation points might indicate trying to convince self/others
-
-Text: "idk... just one of those days i guess"
-Human Analysis: Emotional withdrawal indicated by lowercase, ellipsis shows hesitation/sadness; minimizing with "i guess" suggests difficulty acknowledging feelings
-
-Text: "Why does everything have to be so complicated?"
-Human Analysis: Overwhelm and frustration; questioning suggests seeking understanding; "everything" indicates global thinking pattern common in stress/depression
+6. **Temporal and Relational Context**:
+   - How does this fit their emotional journey?
+   - What relationship dynamics might be involved?
+   - What life transitions or challenges might be present?
+   - What strengths and resources do they have?
 
 RESPONSE FORMAT (JSON only, no additional text):
 {
@@ -137,17 +129,32 @@ RESPONSE FORMAT (JSON only, no additional text):
   }
 }
 
-CRITICAL INSTRUCTIONS:
-- Use fuzzy logic, not binary thinking
-- Consider emotional subtext and implications
-- Look for patterns in communication style
-- Identify defensive or protective language
-- Assess vulnerability and openness levels
-- Recognize coping and regulation attempts
-- Consider relational and social context
-- Identify strength and resilience markers
-- Think like a human with emotional intelligence
-- Respond ONLY with valid JSON, no explanations`;
+EXAMPLES OF HUMAN-LIKE REASONING:
+
+Instead of: "Contains word 'fine' = neutral emotion"
+Think like: "Says they're 'fine' but context suggests they're actually struggling and don't want to burden others"
+
+Instead of: "No sad words = not sad"
+Think like: "Very short responses, lack of usual enthusiasm, might be withdrawing due to sadness"
+
+Instead of: "Contains 'stressed' = high stress"
+Think like: "Mentions being 'a bit stressed' but tone suggests they're minimizing significant overwhelm"
+
+Instead of: "Positive words = happy"
+Think like: "Using positive language but seems forced, might be trying to convince themselves or others"
+
+FOCUS ON:
+- Emotional subtext and implications
+- What they're NOT saying directly
+- Patterns of emotional expression
+- Defensive or protective language
+- Vulnerability and openness levels
+- Coping and regulation attempts
+- Relational and social context
+- Growth and healing indicators
+- Strength and resilience markers
+
+Analyze with the wisdom of human emotional intelligence, not just computational pattern matching. Respond ONLY with valid JSON.`;
 
   console.log('🤖 Calling Qwen API via OpenRouter for human-like analysis...');
 
@@ -209,7 +216,7 @@ CRITICAL INSTRUCTIONS:
       
       // Ensure all required fields have valid values with fuzzy logic bounds
       const validatedAnalysis: EmotionAnalysis = {
-        primary_emotion: parsedAnalysis.primary_emotion || 'neutral',
+        ...parsedAnalysis,
         confidence: Math.max(0, Math.min(1, parsedAnalysis.confidence || 0.5)),
         all_emotions: Array.isArray(parsedAnalysis.all_emotions) ? 
           parsedAnalysis.all_emotions.map((e: any) => ({
