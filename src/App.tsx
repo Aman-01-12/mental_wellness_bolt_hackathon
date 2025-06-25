@@ -4,7 +4,8 @@ import { useAuthStore } from './store/authStore';
 import { AuthPage } from './components/auth/AuthPage';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
 import { Dashboard } from './components/dashboard/Dashboard';
-import { ChatInterface } from './components/chat/ChatInterface';
+import { AIChatInterface } from './components/chat/AIChatInterface';
+import { PeerChatInterface } from './components/chat/PeerChatInterface';
 import { PeerMatching } from './components/peer/PeerMatching';
 import { ProfilePage } from './components/profile/ProfilePage';
 import { ActiveFlags } from './components/flags/ActiveFlags';
@@ -55,8 +56,8 @@ function App() {
       <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/chat" element={<ChatInterface />} />
-          <Route path="/chat/:conversationId" element={<ChatInterface />} />
+          <Route path="/chat" element={<AIChatInterface />} />
+          <Route path="/chat/:conversationId" element={<PeerChatInterface />} />
           <Route path="/peer-matching" element={<PeerMatching />} />
           <Route path="/active-flags" element={<ActiveFlags />} />
           <Route path="/inbox" element={<Inbox />} />
