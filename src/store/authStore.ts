@@ -1,127 +1,188 @@
-import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
-import type { User } from '@supabase/supabase-js';
-import type { Database } from '../lib/supabase';
-
-type UserProfile = Database['public']['Tables']['users']['Row'];
+import { create } from 'zustand'
+import { User, Session } from '@supabase/supabase-js'
+import { supabase, clearAuthData } from '../lib/supabase'
 
 interface AuthState {
-  user: User | null;
-  profile: UserProfile | null;
-  loading: boolean;
-  onboardingCompleted: boolean;
-  setUser: (user: User | null) => void;
-  setProfile: (profile: UserProfile | null) => void;
-  setLoading: (loading: boolean) => void;
-  signUp: (email: string, password: string) => Promise<void>;
-  signIn: (email: string, password: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  updateProfile: (data: Partial<UserProfile>) => Promise<void>;
-  fetchProfile: () => Promise<void>;
+  user: User | null
+  session: Session | null
+  loading: boolean
+  error: string | null
+  signIn: (email: string, password: string) => Promise<void>
+  signUp: (email: string, password: string) => Promise<void>
+  signOut: () => Promise<void>
+  clearError: () => void
+  initializeAuth: () => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
-  profile: null,
+  session: null,
   loading: true,
-  onboardingCompleted: false,
+  error: null,
 
-  setUser: (user) => set({ user }),
-  setProfile: (profile) => 
-    set({ 
-      profile, 
-      onboardingCompleted: profile?.onboarding_completed || false 
-    }),
-  setLoading: (loading) => set({ loading }),
-
-  signUp: async (email, password) => {
-    set({ loading: true });
+  signIn: async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      set({ loading: true, error: null })
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
-      });
-      if (error) throw error;
-    } finally {
-      set({ loading: false });
+      })
+
+      if (error) {
+        if (error.message.includes('refresh_token_not_found') || 
+            error.message.includes('Invalid Refresh Token')) {
+          clearAuthData()
+          throw new Error('Session expired. Please try signing in again.')
+        }
+        throw error
+      }
+
+      set({ 
+        user: data.user, 
+        session: data.session,
+        loading: false,
+        error: null 
+      })
+    } catch (error: any) {
+      set({ 
+        error: error.message || 'Failed to sign in',
+        loading: false 
+      })
+      throw error
     }
   },
 
-  signIn: async (email, password) => {
-    set({ loading: true });
+  signUp: async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      set({ loading: true, error: null })
+      
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-      });
-      if (error) throw error;
-    } finally {
-      set({ loading: false });
+      })
+
+      if (error) {
+        if (error.message.includes('refresh_token_not_found') || 
+            error.message.includes('Invalid Refresh Token')) {
+          clearAuthData()
+          throw new Error('Session expired. Please try signing up again.')
+        }
+        throw error
+      }
+
+      set({ 
+        user: data.user, 
+        session: data.session,
+        loading: false,
+        error: null 
+      })
+    } catch (error: any) {
+      set({ 
+        error: error.message || 'Failed to sign up',
+        loading: false 
+      })
+      throw error
     }
   },
 
   signOut: async () => {
-    set({ loading: true });
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      set({ user: null, profile: null, onboardingCompleted: false });
-    } finally {
-      set({ loading: false });
+      set({ loading: true, error: null })
+      
+      const { error } = await supabase.auth.signOut()
+      
+      if (error && !error.message.includes('refresh_token_not_found')) {
+        throw error
+      }
+
+      // Always clear local state and auth data on sign out
+      clearAuthData()
+      set({ 
+        user: null, 
+        session: null, 
+        loading: false,
+        error: null 
+      })
+    } catch (error: any) {
+      // Even if signOut fails, clear local state
+      clearAuthData()
+      set({ 
+        user: null, 
+        session: null, 
+        loading: false,
+        error: null 
+      })
     }
   },
 
-  updateProfile: async (data) => {
-    const { user } = get();
-    if (!user) throw new Error('No user found');
+  clearError: () => set({ error: null }),
 
-    const { error } = await supabase
-      .from('users')
-      .upsert({
-        id: user.id,
-        ...data,
-        updated_at: new Date().toISOString(),
-      });
+  initializeAuth: async () => {
+    try {
+      set({ loading: true, error: null })
 
-    if (error) throw error;
-    
-    await get().fetchProfile();
-  },
+      // Get initial session with error handling
+      const { data: { session }, error } = await supabase.auth.getSession()
+      
+      if (error) {
+        if (error.message.includes('refresh_token_not_found') || 
+            error.message.includes('Invalid Refresh Token')) {
+          console.warn('Invalid session on initialization, clearing auth data')
+          clearAuthData()
+          set({ user: null, session: null, loading: false, error: null })
+          return
+        }
+        throw error
+      }
 
-  fetchProfile: async () => {
-    const { user } = get();
-    if (!user) return;
+      set({ 
+        user: session?.user ?? null, 
+        session,
+        loading: false,
+        error: null 
+      })
 
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', user.id)
-      .maybeSingle();
+      // Listen for auth changes with error handling
+      supabase.auth.onAuthStateChange(async (event, session) => {
+        try {
+          if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+            set({ 
+              user: session?.user ?? null, 
+              session,
+              loading: false,
+              error: null 
+            })
+          } else if (event === 'SIGNED_IN') {
+            set({ 
+              user: session?.user ?? null, 
+              session,
+              loading: false,
+              error: null 
+            })
+          }
+        } catch (error: any) {
+          if (error.message?.includes('refresh_token_not_found') || 
+              error.message?.includes('Invalid Refresh Token')) {
+            console.warn('Auth state change error, clearing auth data')
+            clearAuthData()
+            set({ user: null, session: null, loading: false, error: null })
+          } else {
+            console.error('Auth state change error:', error)
+            set({ error: error.message, loading: false })
+          }
+        }
+      })
 
-    if (error) {
-      console.error('Error fetching profile:', error);
-      return;
+    } catch (error: any) {
+      console.error('Auth initialization failed:', error)
+      clearAuthData()
+      set({ 
+        user: null, 
+        session: null, 
+        loading: false,
+        error: null // Don't show initialization errors to user
+      })
     }
-
-    set({ 
-      profile: data,
-      onboardingCompleted: data?.onboarding_completed || false 
-    });
   },
-}));
-
-// Initialize auth state
-supabase.auth.getSession().then(({ data: { session } }) => {
-  useAuthStore.getState().setUser(session?.user ?? null);
-  if (session?.user) {
-    useAuthStore.getState().fetchProfile();
-  }
-  useAuthStore.getState().setLoading(false);
-});
-
-supabase.auth.onAuthStateChange((event, session) => {
-  useAuthStore.getState().setUser(session?.user ?? null);
-  if (session?.user) {
-    useAuthStore.getState().fetchProfile();
-  }
-});
+}))
