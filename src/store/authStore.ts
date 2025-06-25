@@ -2,23 +2,50 @@ import { create } from 'zustand'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase, clearAuthData } from '../lib/supabase'
 
+interface UserProfile {
+  id: string
+  display_name: string | null
+  age_range: string | null
+  gender: string | null
+  personality_traits: string[] | null
+  work_status: string | null
+  work_style: string | null
+  food_habits: string | null
+  sleep_duration: number | null
+  relationship_status: string | null
+  communication_style: string | null
+  support_type: string | null
+  availability: string | null
+  mental_health_background: any | null
+  privacy_settings: any | null
+  onboarding_completed: boolean
+  created_at: string
+  updated_at: string
+}
+
 interface AuthState {
   user: User | null
+  profile: UserProfile | null
   session: Session | null
   loading: boolean
   error: string | null
+  onboardingCompleted: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
+  updateProfile: (data: Partial<UserProfile>) => Promise<void>
   clearError: () => void
   initializeAuth: () => Promise<void>
+  fetchProfile: () => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
+  profile: null,
   session: null,
   loading: true,
   error: null,
+  onboardingCompleted: false,
 
   signIn: async (email: string, password: string) => {
     try {
@@ -44,6 +71,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         loading: false,
         error: null 
       })
+
+      // Fetch profile after successful sign in
+      await get().fetchProfile()
     } catch (error: any) {
       set({ 
         error: error.message || 'Failed to sign in',
@@ -77,6 +107,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         loading: false,
         error: null 
       })
+
+      // Fetch profile after successful sign up
+      if (data.user) {
+        await get().fetchProfile()
+      }
     } catch (error: any) {
       set({ 
         error: error.message || 'Failed to sign up',
@@ -100,19 +135,70 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       clearAuthData()
       set({ 
         user: null, 
+        profile: null,
         session: null, 
         loading: false,
-        error: null 
+        error: null,
+        onboardingCompleted: false
       })
     } catch (error: any) {
       // Even if signOut fails, clear local state
       clearAuthData()
       set({ 
         user: null, 
+        profile: null,
         session: null, 
         loading: false,
-        error: null 
+        error: null,
+        onboardingCompleted: false
       })
+    }
+  },
+
+  updateProfile: async (data: Partial<UserProfile>) => {
+    const { user } = get()
+    if (!user) throw new Error('No user found')
+
+    try {
+      const { error } = await supabase
+        .from('users')
+        .upsert({
+          id: user.id,
+          ...data,
+          updated_at: new Date().toISOString(),
+        })
+
+      if (error) throw error
+      
+      await get().fetchProfile()
+    } catch (error: any) {
+      set({ error: error.message || 'Failed to update profile' })
+      throw error
+    }
+  },
+
+  fetchProfile: async () => {
+    const { user } = get()
+    if (!user) return
+
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error fetching profile:', error)
+        return
+      }
+
+      set({ 
+        profile: data,
+        onboardingCompleted: data?.onboarding_completed || false 
+      })
+    } catch (error: any) {
+      console.error('Error fetching profile:', error)
     }
   },
 
@@ -130,7 +216,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             error.message.includes('Invalid Refresh Token')) {
           console.warn('Invalid session on initialization, clearing auth data')
           clearAuthData()
-          set({ user: null, session: null, loading: false, error: null })
+          set({ user: null, profile: null, session: null, loading: false, error: null, onboardingCompleted: false })
           return
         }
         throw error
@@ -143,30 +229,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         error: null 
       })
 
+      // Fetch profile if user exists
+      if (session?.user) {
+        await get().fetchProfile()
+      }
+
       // Listen for auth changes with error handling
       supabase.auth.onAuthStateChange(async (event, session) => {
         try {
-          if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+          if (event === 'SIGNED_OUT') {
+            set({ 
+              user: null,
+              profile: null, 
+              session: null,
+              loading: false,
+              error: null,
+              onboardingCompleted: false
+            })
+          } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
             set({ 
               user: session?.user ?? null, 
               session,
               loading: false,
               error: null 
             })
-          } else if (event === 'SIGNED_IN') {
-            set({ 
-              user: session?.user ?? null, 
-              session,
-              loading: false,
-              error: null 
-            })
+            
+            // Fetch profile on sign in
+            if (session?.user) {
+              await get().fetchProfile()
+            }
           }
         } catch (error: any) {
           if (error.message?.includes('refresh_token_not_found') || 
               error.message?.includes('Invalid Refresh Token')) {
             console.warn('Auth state change error, clearing auth data')
             clearAuthData()
-            set({ user: null, session: null, loading: false, error: null })
+            set({ user: null, profile: null, session: null, loading: false, error: null, onboardingCompleted: false })
           } else {
             console.error('Auth state change error:', error)
             set({ error: error.message, loading: false })
@@ -179,9 +277,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       clearAuthData()
       set({ 
         user: null, 
+        profile: null,
         session: null, 
         loading: false,
-        error: null // Don't show initialization errors to user
+        error: null, // Don't show initialization errors to user
+        onboardingCompleted: false
       })
     }
   },

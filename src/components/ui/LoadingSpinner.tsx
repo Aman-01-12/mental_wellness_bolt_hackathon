@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 
 interface LoadingSpinnerProps {
   size?: 'small' | 'medium' | 'large';
-  color?: 'primary' | 'white';
+  color?: 'primary' | 'white' | 'gray' | 'green';
 }
 
 export function LoadingSpinner({ size = 'medium', color = 'primary' }: LoadingSpinnerProps) {
@@ -15,7 +15,9 @@ export function LoadingSpinner({ size = 'medium', color = 'primary' }: LoadingSp
 
   const colorMap = {
     primary: 'text-primary-500',
-    white: 'text-white'
+    white: 'text-white',
+    gray: 'text-gray-500',
+    green: 'text-green-500'
   };
 
   return (

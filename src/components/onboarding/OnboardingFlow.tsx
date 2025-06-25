@@ -1,22 +1,11 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Heart, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
-import { WelcomeStep } from './steps/WelcomeStep';
-import { BasicInfoStep } from './steps/BasicInfoStep';
-import { PersonalityStep } from './steps/PersonalityStep';
-import { LifestyleStep } from './steps/LifestyleStep';
-import { PreferencesStep } from './steps/PreferencesStep';
-import { PrivacyStep } from './steps/PrivacyStep';
-import { CompletionStep } from './steps/CompletionStep';
 
 const steps = [
   'welcome',
   'basic-info',
-  'personality',
-  'lifestyle',
-  'preferences',
-  'privacy',
   'completion'
 ];
 
@@ -43,26 +32,10 @@ export function OnboardingFlow() {
 
   const handleComplete = async () => {
     try {
-      // Explicitly construct user data object to avoid circular references
-      const userData = {
-        display_name: formData.display_name,
-        age_range: formData.age_range,
-        gender: formData.gender,
-        personality_traits: formData.personality_traits,
-        work_status: formData.work_status,
-        work_style: formData.work_style,
-        food_habits: formData.food_habits,
-        sleep_duration: formData.sleep_duration,
-        relationship_status: formData.relationship_status,
-        communication_style: formData.communication_style,
-        support_type: formData.support_type,
-        availability: formData.availability,
-        mental_health_background: formData.mental_health_background,
-        privacy_settings: formData.privacy_settings,
+      await updateProfile({
+        ...formData,
         onboarding_completed: true
-      };
-
-      await updateProfile(userData);
+      });
     } catch (error) {
       console.error('Error completing onboarding:', error);
     }
@@ -74,14 +47,6 @@ export function OnboardingFlow() {
         return <WelcomeStep onNext={handleNext} />;
       case 'basic-info':
         return <BasicInfoStep onNext={handleNext} data={formData} />;
-      case 'personality':
-        return <PersonalityStep onNext={handleNext} data={formData} />;
-      case 'lifestyle':
-        return <LifestyleStep onNext={handleNext} data={formData} />;
-      case 'preferences':
-        return <PreferencesStep onNext={handleNext} data={formData} />;
-      case 'privacy':
-        return <PrivacyStep onNext={handleNext} data={formData} />;
       case 'completion':
         return <CompletionStep onComplete={handleComplete} />;
       default:
@@ -143,6 +108,166 @@ export function OnboardingFlow() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function WelcomeStep({ onNext }: { onNext: () => void }) {
+  return (
+    <div className="text-center">
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="w-20 h-20 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-3xl flex items-center justify-center mx-auto mb-6"
+      >
+        <Heart className="w-10 h-10 text-white" />
+      </motion.div>
+
+      <motion.h1
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="text-3xl font-bold text-gray-900 mb-4"
+      >
+        Welcome to MindSpace
+      </motion.h1>
+
+      <motion.p
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="text-lg text-gray-600 mb-8 max-w-md mx-auto"
+      >
+        We're here to support your mental wellbeing journey. Let's get you started with a quick setup.
+      </motion.p>
+
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        onClick={onNext}
+        className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white py-4 px-6 rounded-2xl font-medium hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+      >
+        <span>Let's Get Started</span>
+        <ArrowRight className="w-5 h-5" />
+      </motion.button>
+    </div>
+  );
+}
+
+function BasicInfoStep({ onNext, data }: { onNext: (data: any) => void; data: any }) {
+  const [displayName, setDisplayName] = useState(data.display_name || '');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onNext({ display_name: displayName });
+  };
+
+  return (
+    <div>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="text-center mb-8"
+      >
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Tell Us About Yourself</h2>
+        <p className="text-gray-600">This helps us personalize your experience</p>
+      </motion.div>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Display Name (Optional)
+          </label>
+          <input
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+            placeholder="How would you like to be called? (can be anonymous)"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            This can be your real name, nickname, or any anonymous name you prefer
+          </p>
+        </motion.div>
+
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          type="submit"
+          className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white py-4 px-6 rounded-2xl font-medium hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+        >
+          <span>Continue</span>
+          <ArrowRight className="w-5 h-5" />
+        </motion.button>
+      </form>
+    </div>
+  );
+}
+
+function CompletionStep({ onComplete }: { onComplete: () => Promise<void> }) {
+  const [isCompleting, setIsCompleting] = useState(false);
+
+  const handleComplete = async () => {
+    setIsCompleting(true);
+    try {
+      await onComplete();
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+    } finally {
+      setIsCompleting(false);
+    }
+  };
+
+  return (
+    <div className="text-center">
+      <motion.h1
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="text-3xl font-bold text-gray-900 mb-4"
+      >
+        You're All Set! 🎉
+      </motion.h1>
+
+      <motion.p
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+        className="text-lg text-gray-600 mb-8 max-w-md mx-auto"
+      >
+        Welcome to MindSpace! You can now start connecting with our supportive community.
+      </motion.p>
+
+      <motion.button
+        whileHover={{ scale: 1.02 }}
+        whileTap={{ scale: 0.98 }}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        onClick={handleComplete}
+        disabled={isCompleting}
+        className="w-full bg-gradient-to-r from-success-500 to-primary-500 text-white py-4 px-6 rounded-2xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+      >
+        {isCompleting ? (
+          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <>
+            <span>Enter MindSpace</span>
+            <Heart className="w-5 h-5" />
+          </>
+        )}
+      </motion.button>
     </div>
   );
 }
