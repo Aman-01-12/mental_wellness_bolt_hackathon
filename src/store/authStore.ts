@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { User, Session } from '@supabase/supabase-js'
-import { supabase, clearAuthData } from '../lib/supabase'
+import { supabase } from '../lib/supabase'
 
 interface UserProfile {
   id: string
@@ -56,14 +56,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         password,
       })
 
-      if (error) {
-        if (error.message.includes('refresh_token_not_found') || 
-            error.message.includes('Invalid Refresh Token')) {
-          clearAuthData()
-          throw new Error('Session expired. Please try signing in again.')
-        }
-        throw error
-      }
+      if (error) throw error
 
       set({ 
         user: data.user, 
@@ -92,14 +85,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         password,
       })
 
-      if (error) {
-        if (error.message.includes('refresh_token_not_found') || 
-            error.message.includes('Invalid Refresh Token')) {
-          clearAuthData()
-          throw new Error('Session expired. Please try signing up again.')
-        }
-        throw error
-      }
+      if (error) throw error
 
       set({ 
         user: data.user, 
@@ -127,12 +113,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       const { error } = await supabase.auth.signOut()
       
-      if (error && !error.message.includes('refresh_token_not_found')) {
-        throw error
-      }
+      if (error) throw error
 
-      // Always clear local state and auth data on sign out
-      clearAuthData()
       set({ 
         user: null, 
         profile: null,
@@ -143,7 +125,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       })
     } catch (error: any) {
       // Even if signOut fails, clear local state
-      clearAuthData()
       set({ 
         user: null, 
         profile: null,
@@ -208,18 +189,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ loading: true, error: null })
 
-      // Get initial session with error handling
+      // Get initial session
       const { data: { session }, error } = await supabase.auth.getSession()
       
       if (error) {
-        if (error.message.includes('refresh_token_not_found') || 
-            error.message.includes('Invalid Refresh Token')) {
-          console.warn('Invalid session on initialization, clearing auth data')
-          clearAuthData()
-          set({ user: null, profile: null, session: null, loading: false, error: null, onboardingCompleted: false })
-          return
-        }
-        throw error
+        console.error('Session error:', error)
+        set({ user: null, profile: null, session: null, loading: false, error: null, onboardingCompleted: false })
+        return
       }
 
       set({ 
@@ -234,9 +210,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         await get().fetchProfile()
       }
 
-      // Listen for auth changes with error handling
+      // Listen for auth changes
       supabase.auth.onAuthStateChange(async (event, session) => {
         try {
+          console.log('Auth state changed:', event)
+          
           if (event === 'SIGNED_OUT') {
             set({ 
               user: null,
@@ -260,21 +238,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             }
           }
         } catch (error: any) {
-          if (error.message?.includes('refresh_token_not_found') || 
-              error.message?.includes('Invalid Refresh Token')) {
-            console.warn('Auth state change error, clearing auth data')
-            clearAuthData()
-            set({ user: null, profile: null, session: null, loading: false, error: null, onboardingCompleted: false })
-          } else {
-            console.error('Auth state change error:', error)
-            set({ error: error.message, loading: false })
-          }
+          console.error('Auth state change error:', error)
+          set({ error: error.message, loading: false })
         }
       })
 
     } catch (error: any) {
       console.error('Auth initialization failed:', error)
-      clearAuthData()
       set({ 
         user: null, 
         profile: null,

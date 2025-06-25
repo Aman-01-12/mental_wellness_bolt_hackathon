@@ -4,32 +4,7 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables')
-}
-
-// Function to clear corrupted auth data
-const clearAuthData = () => {
-  try {
-    // Clear all Supabase-related items from localStorage
-    const keysToRemove = []
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i)
-      if (key && key.startsWith('sb-')) {
-        keysToRemove.push(key)
-      }
-    }
-    keysToRemove.forEach(key => localStorage.removeItem(key))
-    
-    // Also clear sessionStorage
-    for (let i = 0; i < sessionStorage.length; i++) {
-      const key = sessionStorage.key(i)
-      if (key && key.startsWith('sb-')) {
-        sessionStorage.removeItem(key)
-      }
-    }
-  } catch (error) {
-    console.warn('Failed to clear auth data:', error)
-  }
+  throw new Error('Missing Supabase environment variables. Please check your .env file.')
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -51,59 +26,80 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 })
 
-// Handle auth errors globally
-supabase.auth.onAuthStateChange((event, session) => {
-  if (event === 'TOKEN_REFRESHED') {
-    console.log('Token refreshed successfully')
-  } else if (event === 'SIGNED_OUT') {
-    console.log('User signed out')
-    // Disconnect realtime when user signs out
-    supabase.removeAllChannels()
-  } else if (event === 'SIGNED_IN') {
-    console.log('User signed in')
-  }
-})
-
-// Add error handling for refresh token issues
-const originalRefreshSession = supabase.auth.refreshSession.bind(supabase.auth)
-supabase.auth.refreshSession = async () => {
-  try {
-    return await originalRefreshSession()
-  } catch (error: any) {
-    if (error?.message?.includes('refresh_token_not_found') || 
-        error?.message?.includes('Invalid Refresh Token')) {
-      console.warn('Invalid refresh token detected, clearing auth data')
-      clearAuthData()
-      // Force a fresh session
-      await supabase.auth.signOut()
-    }
-    throw error
-  }
-}
-
-// Initialize auth with error handling
-const initializeAuth = async () => {
-  try {
-    const { data: { session }, error } = await supabase.auth.getSession()
-    if (error) {
-      if (error.message.includes('refresh_token_not_found') || 
-          error.message.includes('Invalid Refresh Token')) {
-        console.warn('Invalid session detected during initialization, clearing auth data')
-        clearAuthData()
-        await supabase.auth.signOut()
-      } else {
-        console.error('Auth initialization error:', error)
-      }
-    }
-    return session
-  } catch (error) {
-    console.error('Failed to initialize auth:', error)
-    clearAuthData()
-    return null
-  }
-}
-
-// Call initialization
-initializeAuth()
-
-export { clearAuthData }
+export type Database = {
+  public: {
+    Tables: {
+      users: {
+        Row: {
+          id: string;
+          display_name: string | null;
+          age_range: string | null;
+          gender: string | null;
+          personality_traits: string[] | null;
+          work_status: string | null;
+          work_style: string | null;
+          food_habits: string | null;
+          sleep_duration: number | null;
+          relationship_status: string | null;
+          communication_style: string | null;
+          support_type: string | null;
+          availability: string | null;
+          mental_health_background: any | null;
+          privacy_settings: any | null;
+          onboarding_completed: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          display_name?: string | null;
+          age_range?: string | null;
+          gender?: string | null;
+          personality_traits?: string[] | null;
+          work_status?: string | null;
+          work_style?: string | null;
+          food_habits?: string | null;
+          sleep_duration?: number | null;
+          relationship_status?: string | null;
+          communication_style?: string | null;
+          support_type?: string | null;
+          availability?: string | null;
+          mental_health_background?: any | null;
+          privacy_settings?: any | null;
+          onboarding_completed?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          display_name?: string | null;
+          age_range?: string | null;
+          gender?: string | null;
+          personality_traits?: string[] | null;
+          work_status?: string | null;
+          work_style?: string | null;
+          food_habits?: string | null;
+          sleep_duration?: number | null;
+          relationship_status?: string | null;
+          communication_style?: string | null;
+          support_type?: string | null;
+          availability?: string | null;
+          mental_health_background?: any | null;
+          privacy_settings?: any | null;
+          onboarding_completed?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      [_ in never]: never;
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+  };
+};

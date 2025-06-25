@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { AuthPage } from './components/auth/AuthPage';
@@ -12,24 +12,44 @@ import { Inbox } from './components/inbox/Inbox';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 
 function App() {
-  const { user, loading, onboardingCompleted } = useAuthStore();
+  const { user, loading, onboardingCompleted, initializeAuth } = useAuthStore();
 
+  // Initialize auth on app start
+  useEffect(() => {
+    initializeAuth();
+  }, [initializeAuth]);
+
+  // Show loading spinner while initializing
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 flex items-center justify-center">
-        <LoadingSpinner size="large" />
+        <div className="text-center">
+          <LoadingSpinner size="large" />
+          <p className="mt-4 text-gray-600">Loading MindSpace...</p>
+        </div>
       </div>
     );
   }
 
+  // Show auth page if not authenticated
   if (!user) {
-    return <AuthPage />;
+    return (
+      <Router>
+        <AuthPage />
+      </Router>
+    );
   }
 
+  // Show onboarding if not completed
   if (!onboardingCompleted) {
-    return <OnboardingFlow />;
+    return (
+      <Router>
+        <OnboardingFlow />
+      </Router>
+    );
   }
 
+  // Show main app
   return (
     <Router>
       <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
