@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { MessageCircle, ArrowLeft, Users, Clock, Send, MoreVertical, Smile, Paperclip, Phone, Video } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MessageCircle, ArrowLeft, Users, Clock, Send, MoreVertical, Smile, Paperclip, Phone, Video, Eye, EyeOff, User } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { useAuthStore } from '../../store/authStore';
@@ -34,8 +34,15 @@ interface Message {
   isOptimistic?: boolean; // For optimistic updates
 }
 
+interface NameReveal {
+  conversation_id: string;
+  user_id: string;
+  revealed_name: string;
+  revealed_at: string;
+}
+
 export function Inbox() {
-  const { user } = useAuthStore();
+  const { user, profile } = useAuthStore();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -44,6 +51,9 @@ export function Inbox() {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameReveals, setNameReveals] = useState<NameReveal[]>([]);
+  const [showRevealModal, setShowRevealModal] = useState(false);
+  const [revealingName, setRevealingName] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -56,6 +66,7 @@ export function Inbox() {
   useEffect(() => {
     if (selectedConversation) {
       fetchMessages(selectedConversation.id);
+      fetchNameReveals(selectedConversation.id);
     }
   }, [selectedConversation]);
 
@@ -223,6 +234,26 @@ export function Inbox() {
     }
   };
 
+  const fetchNameReveals = async (conversationId: string) => {
+    try {
+      // Check if we have a name_reveals table, if not, we'll create it via migration
+      const { data: nameRevealsData, error } = await supabase
+        .from('name_reveals')
+        .select('*')
+        .eq('conversation_id', conversationId);
+
+      if (!error && nameRevealsData) {
+        setNameReveals(nameRevealsData);
+      } else {
+        // Table might not exist yet, that's okay
+        setNameReveals([]);
+      }
+    } catch (err: any) {
+      console.error('Error fetching name reveals:', err);
+      setNameReveals([]);
+    }
+  };
+
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation || sendingMessage) return;
 
@@ -324,6 +355,65 @@ export function Inbox() {
     }
   };
 
+  const revealName = async () => {
+    if (!selectedConversation || !profile?.display_name || revealingName) return;
+
+    setRevealingName(true);
+    
+    try {
+      // First, try to insert the name reveal into the database
+      const { data: nameRevealData, error: nameRevealError } = await supabase
+        .from('name_reveals')
+        .insert({
+          conversation_id: selectedConversation.id,
+          user_id: user!.id,
+          revealed_name: profile.display_name,
+          revealed_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (nameRevealError) {
+        // If table doesn't exist, we'll create a system message instead
+        console.log('Name reveals table not available, sending as system message');
+      } else {
+        // Update local state
+        setNameReveals(prev => [...prev, nameRevealData]);
+      }
+
+      // Send a system message about the name reveal
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated');
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const response = await fetch(`${supabaseUrl}/functions/v1/send-message`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          conversation_id: selectedConversation.id,
+          content: `🎭 I've revealed my name: ${profile.display_name}`,
+          message_type: 'system'
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to send name reveal message');
+      }
+
+      setShowRevealModal(false);
+      
+    } catch (err: any) {
+      console.error('Error revealing name:', err);
+      alert(err.message || 'Failed to reveal name');
+    } finally {
+      setRevealingName(false);
+    }
+  };
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -355,6 +445,15 @@ export function Inbox() {
     } else {
       return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
     }
+  };
+
+  // Check if current user has revealed their name in this conversation
+  const hasRevealedName = nameReveals.some(reveal => reveal.user_id === user?.id);
+
+  // Get revealed name for a user in this conversation
+  const getRevealedName = (userId: string) => {
+    const reveal = nameReveals.find(r => r.user_id === userId);
+    return reveal?.revealed_name;
   };
 
   return (
@@ -443,7 +542,7 @@ export function Inbox() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
                               <span className="font-medium text-gray-900 truncate">
-                                {conversation.other_participant?.display_name || 'Anonymous'}
+                                {getRevealedName(conversation.other_participant?.id || '') || conversation.other_participant?.display_name || 'Anonymous'}
                               </span>
                               {conversation.last_message && (
                                 <span className="text-xs text-gray-500 flex-shrink-0">
@@ -480,7 +579,7 @@ export function Inbox() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900">
-                          {selectedConversation.other_participant?.display_name || 'Anonymous'}
+                          {getRevealedName(selectedConversation.other_participant?.id || '') || selectedConversation.other_participant?.display_name || 'Anonymous'}
                         </h3>
                         <p className="text-xs text-gray-500">
                           Peer Support • Active now
@@ -488,6 +587,27 @@ export function Inbox() {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
+                      {/* Reveal Name Button */}
+                      {!hasRevealedName && profile?.display_name && (
+                        <motion.button
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => setShowRevealModal(true)}
+                          className="flex items-center space-x-2 px-3 py-2 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-lg text-sm font-medium hover:shadow-lg transition-all"
+                          title="Reveal your real name"
+                        >
+                          <User className="w-4 h-4" />
+                          <span>Reveal Name</span>
+                        </motion.button>
+                      )}
+                      
+                      {hasRevealedName && (
+                        <div className="flex items-center space-x-2 px-3 py-2 bg-green-100 text-green-700 rounded-lg text-sm">
+                          <Eye className="w-4 h-4" />
+                          <span>Name Revealed</span>
+                        </div>
+                      )}
+                      
                       <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
                         <Phone className="w-4 h-4" />
                       </button>
@@ -523,6 +643,7 @@ export function Inbox() {
                       <>
                         {messages.map((message, index) => {
                           const isOwn = message.sender_id === user?.id;
+                          const isSystemMessage = message.message_type === 'system';
                           const showTimestamp = index === 0 || 
                             new Date(message.timestamp).getTime() - new Date(messages[index - 1].timestamp).getTime() > 300000; // 5 minutes
                           
@@ -535,30 +656,41 @@ export function Inbox() {
                                   </span>
                                 </div>
                               )}
-                              <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[70%] rounded-2xl px-4 py-3 shadow-sm ${
-                                  isOwn
-                                    ? message.isOptimistic 
-                                      ? 'bg-gradient-to-r from-primary-400 to-secondary-400 text-white opacity-70'
-                                      : 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white'
-                                    : 'bg-white text-gray-900 border border-gray-100'
-                                }`}>
-                                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                                  <div className="flex items-center justify-between mt-2">
-                                    <p className={`text-xs ${
-                                      isOwn ? 'text-white/70' : 'text-gray-500'
-                                    }`}>
-                                      {new Date(message.timestamp).toLocaleTimeString([], { 
-                                        hour: '2-digit', 
-                                        minute: '2-digit' 
-                                      })}
+                              
+                              {isSystemMessage ? (
+                                <div className="flex justify-center my-4">
+                                  <div className="bg-gradient-to-r from-purple-100 to-pink-100 border border-purple-200 rounded-xl px-4 py-2 max-w-md">
+                                    <p className="text-sm text-purple-800 text-center font-medium">
+                                      {message.content}
                                     </p>
-                                    {message.isOptimistic && (
-                                      <span className="text-xs text-white/50 ml-2">Sending...</span>
-                                    )}
                                   </div>
                                 </div>
-                              </div>
+                              ) : (
+                                <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                                  <div className={`max-w-[70%] rounded-2xl px-4 py-3 shadow-sm ${
+                                    isOwn
+                                      ? message.isOptimistic 
+                                        ? 'bg-gradient-to-r from-primary-400 to-secondary-400 text-white opacity-70'
+                                        : 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white'
+                                      : 'bg-white text-gray-900 border border-gray-100'
+                                  }`}>
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                                    <div className="flex items-center justify-between mt-2">
+                                      <p className={`text-xs ${
+                                        isOwn ? 'text-white/70' : 'text-gray-500'
+                                      }`}>
+                                        {new Date(message.timestamp).toLocaleTimeString([], { 
+                                          hour: '2-digit', 
+                                          minute: '2-digit' 
+                                        })}
+                                      </p>
+                                      {message.isOptimistic && (
+                                        <span className="text-xs text-white/50 ml-2">Sending...</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -660,6 +792,84 @@ export function Inbox() {
           </div>
         </motion.div>
       </div>
+
+      {/* Reveal Name Modal */}
+      <AnimatePresence>
+        {showRevealModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowRevealModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6"
+            >
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <User className="w-8 h-8 text-white" />
+                </div>
+                <h2 className="text-xl font-bold text-gray-900 mb-2">Reveal Your Name</h2>
+                <p className="text-gray-600 text-sm">
+                  Share your real name with this person to build a deeper connection
+                </p>
+              </div>
+
+              <div className="bg-gradient-to-r from-primary-50 to-secondary-50 rounded-2xl p-4 mb-6">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center">
+                    <User className="w-6 h-6 text-primary-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-600">You will reveal:</p>
+                    <p className="text-lg font-semibold text-gray-900">{profile?.display_name}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
+                <div className="flex items-start space-x-2">
+                  <EyeOff className="w-4 h-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm text-yellow-800 font-medium">Privacy Notice</p>
+                    <p className="text-xs text-yellow-700 mt-1">
+                      Once revealed, your name will be visible to this person for the duration of your conversation. This action cannot be undone.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => setShowRevealModal(false)}
+                  className="flex-1 px-4 py-3 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={revealName}
+                  disabled={revealingName}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                >
+                  {revealingName ? (
+                    <LoadingSpinner size="small" color="white" />
+                  ) : (
+                    <>
+                      <Eye className="w-4 h-4" />
+                      <span>Reveal Name</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
