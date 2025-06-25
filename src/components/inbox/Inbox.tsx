@@ -279,11 +279,11 @@ export function Inbox() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl shadow-lg overflow-hidden"
+          className="bg-white rounded-3xl shadow-lg overflow-hidden flex flex-col"
           style={{ height: 'calc(100vh - 8rem)' }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-white">
+          <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-white flex-shrink-0">
             <div className="flex items-center space-x-4">
               <Link
                 to="/"
@@ -309,10 +309,10 @@ export function Inbox() {
             </Link>
           </div>
 
-          <div className="flex h-full">
+          <div className="flex flex-1 min-h-0">
             {/* Conversations List */}
-            <div className="w-80 border-r border-gray-100 flex flex-col bg-gray-50">
-              <div className="p-4 border-b border-gray-200 bg-white">
+            <div className="w-80 border-r border-gray-100 flex flex-col bg-gray-50 flex-shrink-0">
+              <div className="p-4 border-b border-gray-200 bg-white flex-shrink-0">
                 <h2 className="font-semibold text-gray-900">Messages</h2>
                 <p className="text-xs text-gray-500 mt-1">{conversations.length} conversation{conversations.length !== 1 ? 's' : ''}</p>
               </div>
@@ -383,11 +383,11 @@ export function Inbox() {
             </div>
 
             {/* Chat Area */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
               {selectedConversation ? (
                 <>
                   {/* Chat Header */}
-                  <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white">
+                  <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white flex-shrink-0">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-primary-500 rounded-full flex items-center justify-center">
                         <Users className="w-5 h-5 text-white" />
@@ -415,7 +415,7 @@ export function Inbox() {
                   </div>
 
                   {/* Messages */}
-                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                  <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 min-h-0">
                     {messagesLoading ? (
                       <div className="flex justify-center py-8">
                         <LoadingSpinner size="medium" />
@@ -474,52 +474,51 @@ export function Inbox() {
                     )}
                   </div>
 
-                  {/* Message Input - Instagram Style */}
-                  <div className="p-4 bg-white border-t border-gray-100">
-                    <div className="flex items-end space-x-3">
+                  {/* Message Input - FIXED AND ALWAYS VISIBLE */}
+                  <div className="p-6 bg-white border-t border-gray-200 flex-shrink-0">
+                    <div className="flex items-end space-x-4">
                       {/* Attachment Button */}
-                      <button className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all">
+                      <button className="p-3 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all flex-shrink-0">
                         <Paperclip className="w-5 h-5" />
                       </button>
 
-                      {/* Message Input Container */}
+                      {/* Message Input Container - ENHANCED VISIBILITY */}
                       <div className="flex-1 relative">
-                        <div className="flex items-end bg-gray-100 rounded-3xl px-4 py-2">
+                        <div className="flex items-end bg-gray-100 rounded-3xl px-5 py-3 border-2 border-transparent focus-within:border-primary-300 transition-all">
                           <textarea
                             ref={messageInputRef}
                             value={newMessage}
                             onChange={(e) => setNewMessage(e.target.value)}
                             onKeyPress={handleKeyPress}
-                            placeholder="Message..."
-                            className="flex-1 bg-transparent border-none outline-none resize-none text-sm placeholder-gray-500 py-2"
+                            placeholder="Type your message here..."
+                            className="flex-1 bg-transparent border-none outline-none resize-none text-sm placeholder-gray-500 py-1 min-h-[24px] max-h-[120px]"
                             rows={1}
+                            disabled={sendingMessage}
                             style={{
-                              minHeight: '20px',
-                              maxHeight: '100px',
-                              height: 'auto'
+                              height: 'auto',
+                              lineHeight: '1.5'
                             }}
                             onInput={(e) => {
                               const target = e.target as HTMLTextAreaElement;
                               target.style.height = 'auto';
-                              target.style.height = `${Math.min(target.scrollHeight, 100)}px`;
+                              target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
                             }}
-                            disabled={sendingMessage}
                           />
                           
                           {/* Emoji Button */}
-                          <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors ml-2">
+                          <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors ml-2 flex-shrink-0">
                             <Smile className="w-5 h-5" />
                           </button>
                         </div>
                       </div>
 
-                      {/* Send Button */}
+                      {/* Send Button - ENHANCED VISIBILITY */}
                       <button
                         onClick={sendMessage}
                         disabled={!newMessage.trim() || sendingMessage}
-                        className={`p-3 rounded-full transition-all ${
+                        className={`p-4 rounded-full transition-all flex-shrink-0 ${
                           newMessage.trim() && !sendingMessage
-                            ? 'bg-primary-500 hover:bg-primary-600 text-white shadow-lg hover:shadow-xl'
+                            ? 'bg-primary-500 hover:bg-primary-600 text-white shadow-lg hover:shadow-xl transform hover:scale-105'
                             : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                         }`}
                       >
@@ -531,10 +530,15 @@ export function Inbox() {
                       </button>
                     </div>
                     
-                    {/* Character Count and Tips */}
-                    <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
-                      <span>Press Enter to send, Shift+Enter for new line</span>
-                      <span className={newMessage.length > 900 ? 'text-orange-500' : ''}>
+                    {/* Character Count and Tips - ALWAYS VISIBLE */}
+                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                      <span className="flex items-center space-x-4">
+                        <span>Press Enter to send, Shift+Enter for new line</span>
+                        {newMessage.trim() && (
+                          <span className="text-primary-600 font-medium">Ready to send!</span>
+                        )}
+                      </span>
+                      <span className={newMessage.length > 900 ? 'text-orange-500 font-medium' : ''}>
                         {newMessage.length}/1000
                       </span>
                     </div>
