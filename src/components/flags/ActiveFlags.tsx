@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Flag, ArrowLeft, Users, Filter, Search, Clock } from 'lucide-react';
+import { Flag, ArrowLeft, Users, Filter, Search, Clock, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { useAuthStore } from '../../store/authStore';
@@ -53,6 +53,7 @@ export function ActiveFlags() {
     
     try {
       console.log('🎫 Fetching tickets with filters:', filters);
+      console.log('🔑 Current user ID:', user?.id);
       
       // Get the auth token from Supabase session
       const { data: { session } } = await supabase.auth.getSession();
@@ -60,18 +61,25 @@ export function ActiveFlags() {
         throw new Error('No authentication session found. Please sign in again.');
       }
 
+      console.log('🔐 Auth token exists:', !!session.access_token);
+
       // Call the Edge Function with proper URL and filters
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) {
         throw new Error('Supabase URL not configured');
       }
 
+      console.log('🌐 Supabase URL:', supabaseUrl);
+
       // Build query params for filtering
       const params = new URLSearchParams();
       if (filters.emotional_state) params.append('emotional_state', filters.emotional_state);
       if (filters.need_tag) params.append('need_tag', filters.need_tag);
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/list-tickets?${params.toString()}`, {
+      const url = `${supabaseUrl}/functions/v1/list-tickets?${params.toString()}`;
+      console.log('📡 Calling URL:', url);
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -80,6 +88,7 @@ export function ActiveFlags() {
       });
 
       console.log('📡 Response status:', response.status);
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -117,16 +126,22 @@ export function ActiveFlags() {
         throw new Error(result.error || 'Failed to fetch tickets');
       }
 
+      console.log('📊 Raw tickets from API:', result.tickets);
+
       // Filter out user's own tickets and apply client-side filters
-      let filteredTickets = (result.tickets || []).filter((ticket: Ticket) => 
-        ticket.user_id !== user?.id
-      );
+      let filteredTickets = (result.tickets || []).filter((ticket: Ticket) => {
+        console.log('🔍 Checking ticket:', ticket.id, 'user_id:', ticket.user_id, 'current user:', user?.id);
+        return ticket.user_id !== user?.id;
+      });
+
+      console.log('🚫 After filtering out own tickets:', filteredTickets.length);
 
       // Apply age range filter (client-side since it's not in the API yet)
       if (filters.age_range) {
         filteredTickets = filteredTickets.filter((ticket: Ticket) => 
           ticket.age_range === filters.age_range
         );
+        console.log('👥 After age filter:', filteredTickets.length);
       }
 
       // Apply search filter (client-side)
@@ -138,10 +153,11 @@ export function ActiveFlags() {
           ticket.need_tags?.some(tag => tag.toLowerCase().includes(searchLower)) ||
           (ticket.details && typeof ticket.details === 'string' && ticket.details.toLowerCase().includes(searchLower))
         );
+        console.log('🔍 After search filter:', filteredTickets.length);
       }
 
       setTickets(filteredTickets);
-      console.log('🎉 Tickets loaded and filtered:', filteredTickets.length);
+      console.log('🎉 Final tickets loaded and filtered:', filteredTickets.length);
       
     } catch (err: any) {
       console.error('❌ Error fetching tickets:', err);
@@ -203,7 +219,15 @@ export function ActiveFlags() {
                 <p className="text-sm text-gray-500">Find people who need support right now</p>
               </div>
             </div>
-            <div className="flex-1 flex justify-end">
+            <div className="flex-1 flex justify-end space-x-3">
+              <button
+                onClick={fetchTickets}
+                className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
+                disabled={loading}
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
               <Link
                 to="/peer-matching"
                 className="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-xl font-medium transition-all shadow-sm"
@@ -305,14 +329,33 @@ export function ActiveFlags() {
             )}
           </div>
 
+          {/* Debug Info */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="p-4 bg-yellow-50 border-b border-yellow-200">
+              <div className="text-xs text-yellow-800">
+                <strong>Debug Info:</strong> User ID: {user?.id} | Loading: {loading.toString()} | Error: {error || 'None'} | Tickets: {tickets.length}
+              </div>
+            </div>
+          )}
+
           {/* Results */}
           <div className="p-6">
             {loading ? (
-              <div className="flex justify-center py-12">
+              <div className="flex flex-col items-center justify-center py-12">
                 <LoadingSpinner size="large" />
+                <p className="text-gray-500 mt-4">Loading support requests...</p>
               </div>
             ) : error ? (
-              <div className="bg-red-100 text-red-700 rounded-xl p-4 text-center">{error}</div>
+              <div className="bg-red-100 text-red-700 rounded-xl p-4 text-center">
+                <p className="font-medium mb-2">Error loading requests</p>
+                <p className="text-sm">{error}</p>
+                <button
+                  onClick={fetchTickets}
+                  className="mt-3 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                >
+                  Try Again
+                </button>
+              </div>
             ) : tickets.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
@@ -330,7 +373,13 @@ export function ActiveFlags() {
                 ) : (
                   <>
                     <p className="text-lg font-semibold">No active support requests right now</p>
-                    <p className="text-sm">Check back soon or create your own request</p>
+                    <p className="text-sm mb-4">Check back soon or create your own request</p>
+                    <Link
+                      to="/peer-matching"
+                      className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
+                    >
+                      Create Support Request
+                    </Link>
                   </>
                 )}
               </div>
