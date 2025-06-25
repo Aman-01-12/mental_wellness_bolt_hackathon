@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { MessageCircle, ArrowLeft, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -26,96 +26,102 @@ export function Inbox() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const fetchConversations = useCallback(async () => {
+    if (!user) return;
+
+    try {
+      setError(null);
+
+      // Fetch conversations where user is a participant
+      const { data: conversationsData, error: conversationsError } = await supabase
+        .from('conversations')
+        .select(`
+          id,
+          participant_ids,
+          type,
+          started_at,
+          status
+        `)
+        .contains('participant_ids', [user.id])
+        .eq('status', 'active')
+        .order('started_at', { ascending: false });
+
+      if (conversationsError) {
+        throw conversationsError;
+      }
+
+      // For each conversation, get the latest message
+      const conversationsWithMessages = await Promise.all(
+        (conversationsData || []).map(async (conversation) => {
+          const { data: latestMessages } = await supabase
+            .from('messages')
+            .select('content, timestamp, sender_id')
+            .eq('conversation_id', conversation.id)
+            .order('timestamp', { ascending: false })
+            .limit(1);
+
+          return {
+            ...conversation,
+            latest_message: latestMessages && latestMessages.length > 0 ? latestMessages[0] : undefined
+          };
+        })
+      );
+
+      setConversations(conversationsWithMessages);
+
+    } catch (err: any) {
+      console.error('Error fetching conversations:', err);
+      setError(err.message || 'Failed to load conversations');
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  // Initial fetch
+  useEffect(() => {
+    if (!user) return;
+    
+    setLoading(true);
+    fetchConversations();
+  }, [user, fetchConversations]);
+
+  // Realtime subscription management
   useEffect(() => {
     if (!user) return;
 
-    const fetchConversations = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Fetch conversations where user is a participant
-        const { data: conversationsData, error: conversationsError } = await supabase
-          .from('conversations')
-          .select(`
-            id,
-            participant_ids,
-            type,
-            started_at,
-            status
-          `)
-          .contains('participant_ids', [user.id])
-          .eq('status', 'active')
-          .order('started_at', { ascending: false });
-
-        if (conversationsError) {
-          throw conversationsError;
+    // Set up realtime subscription for new messages
+    const subscription = supabase
+      .channel(`inbox-messages-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        (payload) => {
+          console.log('New message received:', payload);
+          // Refresh conversations when new message arrives
+          fetchConversations();
         }
+      )
+      .subscribe((status) => {
+        console.log('Realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          console.log('✅ Successfully subscribed to inbox messages');
+        } else if (status === 'CHANNEL_ERROR') {
+          console.error('❌ Realtime subscription error');
+          setError('Failed to connect to real-time updates');
+        } else if (status === 'TIMED_OUT') {
+          console.error('❌ Realtime subscription timed out');
+          setError('Real-time connection timed out');
+        }
+      });
 
-        // For each conversation, get the latest message
-        const conversationsWithMessages = await Promise.all(
-          (conversationsData || []).map(async (conversation) => {
-            const { data: latestMessage } = await supabase
-              .from('messages')
-              .select('content, timestamp, sender_id')
-              .eq('conversation_id', conversation.id)
-              .order('timestamp', { ascending: false })
-              .limit(1)
-              .single();
-
-            return {
-              ...conversation,
-              latest_message: latestMessage
-            };
-          })
-        );
-
-        setConversations(conversationsWithMessages);
-
-        // Set up realtime subscription for new messages
-        const subscription = supabase
-          .channel('inbox-messages')
-          .on(
-            'postgres_changes',
-            {
-              event: 'INSERT',
-              schema: 'public',
-              table: 'messages',
-              filter: `conversation_id=in.(${conversationsWithMessages.map(c => c.id).join(',')})`
-            },
-            (payload) => {
-              console.log('New message received:', payload);
-              // Refresh conversations when new message arrives
-              fetchConversations();
-            }
-          )
-          .subscribe((status) => {
-            console.log('Realtime subscription status:', status);
-            if (status === 'SUBSCRIBED') {
-              console.log('✅ Successfully subscribed to inbox messages');
-            } else if (status === 'CHANNEL_ERROR') {
-              console.error('❌ Realtime subscription error');
-              setError('Failed to connect to real-time updates');
-            } else if (status === 'TIMED_OUT') {
-              console.error('❌ Realtime subscription timed out');
-              setError('Real-time connection timed out');
-            }
-          });
-
-        return () => {
-          subscription.unsubscribe();
-        };
-
-      } catch (err: any) {
-        console.error('Error fetching conversations:', err);
-        setError(err.message || 'Failed to load conversations');
-      } finally {
-        setLoading(false);
-      }
+    return () => {
+      subscription.unsubscribe();
     };
-
-    fetchConversations();
-  }, [user]);
+  }, [user, fetchConversations]);
 
   if (!user) {
     return (
