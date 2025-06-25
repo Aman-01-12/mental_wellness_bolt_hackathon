@@ -8,6 +8,9 @@ import { aiService, type ChatMessage } from '../../services/aiService';
 import { emotionService, type EmotionAnalysis } from '../../services/emotionService';
 import { useEmotionalAssessment } from '../../hooks/useEmotionalAssessment';
 import { EmotionAssessmentModal } from './EmotionAssessmentModal';
+import { EmotionInsights } from './EmotionInsights';
+import { useContinuousEmotionAnalysis } from '../../hooks/useContinuousEmotionAnalysis';
+import { ContinuousEmotionDashboard } from './ContinuousEmotionDashboard';
 
 interface Message {
   id: string;
@@ -27,6 +30,9 @@ export function AIChatInterface() {
   const [isAnalyzingEmotion, setIsAnalyzingEmotion] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [showInsights, setShowInsights] = useState(false);
+  const [showContinuousAnalysis, setShowContinuousAnalysis] = useState(false);
+  const [lastMessageTime, setLastMessageTime] = useState<Date | null>(null);
 
   // Emotional assessment hook
   const { 
@@ -37,6 +43,15 @@ export function AIChatInterface() {
     dismissAssessment,
     resetAssessmentHistory 
   } = useEmotionalAssessment();
+
+  const {
+    currentAssessment: continuousAssessment,
+    isAnalyzing,
+    analyzeMessage,
+    getEmotionalHistory,
+    resetAnalysis,
+    exportData
+  } = useContinuousEmotionAnalysis();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -64,15 +79,17 @@ export function AIChatInterface() {
     if (!inputValue.trim() || isLoading) return;
 
     const message = inputValue.trim();
+    const currentTime = new Date();
     setInputValue('');
     setError(null);
+    setLastMessageTime(currentTime);
     
     // Add user message
     const userMessage: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
       content: message,
-      timestamp: new Date()
+      timestamp: currentTime
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -84,7 +101,7 @@ export function AIChatInterface() {
       id: 'typing',
       role: 'assistant',
       content: '',
-      timestamp: new Date(),
+      timestamp: currentTime,
       isTyping: true
     };
     setMessages(prev => [...prev, typingMessage]);
@@ -92,11 +109,11 @@ export function AIChatInterface() {
     try {
       // Analyze emotion first
       setIsAnalyzingEmotion(true);
-      let emotionAnalysis: EmotionAnalysis | null = null;
+      let emotionAnalysis: EmotionAnalysis | undefined = undefined;
       try {
         emotionAnalysis = await emotionService.analyzeEmotion(message);
-        setMessages(prev => prev.map(msg => 
-          msg.id === userMessage.id 
+        setMessages(prev => prev.map(msg =>
+          msg.id === userMessage.id
             ? { ...msg, emotionAnalysis: emotionAnalysis || undefined }
             : msg
         ));
@@ -107,6 +124,10 @@ export function AIChatInterface() {
         // Continue with AI response even if emotion analysis fails
       } finally {
         setIsAnalyzingEmotion(false);
+      }
+      // Continuous emotion analysis
+      if (showContinuousAnalysis) {
+        await analyzeMessage(message, lastMessageTime ? currentTime.getTime() - lastMessageTime.getTime() : undefined);
       }
 
       // Prepare conversation history for AI
@@ -125,7 +146,7 @@ export function AIChatInterface() {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: aiResponse,
-        timestamp: new Date()
+        timestamp: currentTime
       };
       setMessages(prev => prev.filter(msg => !msg.isTyping).concat(assistantMessage));
     } catch (err) {
@@ -137,7 +158,7 @@ export function AIChatInterface() {
         id: `error-${Date.now()}`,
         role: 'assistant',
         content: "Sorry, I'm having some trouble right now. Can you try again? I'm still here 💙",
-        timestamp: new Date()
+        timestamp: currentTime
       };
       setMessages(prev => [...prev, errorChatMessage]);
     } finally {
@@ -173,6 +194,11 @@ export function AIChatInterface() {
   const handleFindPeerSupport = () => {
     dismissAssessment();
   };
+
+  // Get the latest user message with emotion analysis for insights
+  const latestUserMessage = messages
+    .filter(msg => msg.role === 'user' && msg.emotionAnalysis)
+    .slice(-1)[0];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 flex flex-col">
@@ -214,6 +240,28 @@ export function AIChatInterface() {
             </div>
             <div className="flex items-center space-x-2">
               <button
+                onClick={() => setShowContinuousAnalysis(!showContinuousAnalysis)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${
+                  showContinuousAnalysis 
+                    ? 'bg-purple-100 text-purple-700' 
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                }`}
+              >
+                <Brain className="w-4 h-4" />
+                <span className="text-sm font-medium">Deep Analysis</span>
+              </button>
+              <button
+                onClick={() => setShowInsights(!showInsights)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${
+                  showInsights 
+                    ? 'bg-primary-100 text-primary-700' 
+                    : 'text-gray-600 hover:text-gray-800 hover:bg-gray-100'
+                }`}
+              >
+                <Sparkles className="w-4 h-4" />
+                <span className="text-sm font-medium">Insights</span>
+              </button>
+              <button
                 onClick={handleClearChat}
                 className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
               >
@@ -223,69 +271,98 @@ export function AIChatInterface() {
             </div>
           </div>
         </motion.div>
-        {/* Messages Container */}
-        <div className="flex-1 bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <AnimatePresence>
-              {messages.map((message) => (
-                <motion.div
-                  key={message.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className={`max-w-[80%] ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
-                    {message.content}
-                  </div>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-            <div ref={messagesEndRef} />
-          </div>
-          {/* Input Form */}
-          <div className="border-t border-gray-100 p-6">
-            <form onSubmit={handleSubmit} className="flex space-x-4">
-              <div className="flex-1 relative">
-                <textarea
-                  ref={inputRef}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Share what's on your mind... Alex will respond with genuine care 💙"
-                  className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors resize-none"
-                  rows={1}
-                  style={{
-                    minHeight: '48px',
-                    maxHeight: '120px',
-                    height: 'auto'
-                  }}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
-                  }}
-                />
+        <div className="flex flex-row gap-6">
+          {/* Main Chat Area */}
+          <div className="flex-1 flex flex-col">
+            {/* Messages Container */}
+            <div className="flex-1 bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col">
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <AnimatePresence>
+                  {messages.map((message) => (
+                    <motion.div
+                      key={message.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -20 }}
+                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`max-w-[80%] ${message.role === 'user' ? 'order-2' : 'order-1'}`}>
+                        {message.content}
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                <div ref={messagesEndRef} />
               </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                type="submit"
-                disabled={!inputValue.trim() || isLoading || isAnalyzingEmotion}
-                className="px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-2xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                {(isLoading || isAnalyzingEmotion) ? (
-                  <LoadingSpinner size="small" color="white" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-                <span>Send</span>
-              </motion.button>
-            </form>
-            <p className="text-xs text-gray-500 mt-3 text-center">
-              Press Enter to send, Shift+Enter for new line. Alex analyzes your emotions to offer better support.
-            </p>
+              {/* Input Form */}
+              <div className="border-t border-gray-100 p-6">
+                <form onSubmit={handleSubmit} className="flex space-x-4">
+                  <div className="flex-1 relative">
+                    <textarea
+                      ref={inputRef}
+                      value={inputValue}
+                      onChange={(e) => setInputValue(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      placeholder="Share what's on your mind... Alex will respond with genuine care 💙"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors resize-none"
+                      rows={1}
+                      style={{
+                        minHeight: '48px',
+                        maxHeight: '120px',
+                        height: 'auto'
+                      }}
+                      onInput={(e) => {
+                        const target = e.target as HTMLTextAreaElement;
+                        target.style.height = 'auto';
+                        target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
+                      }}
+                    />
+                  </div>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    type="submit"
+                    disabled={!inputValue.trim() || isLoading || isAnalyzingEmotion}
+                    className="px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-2xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                  >
+                    {(isLoading || isAnalyzingEmotion) ? (
+                      <LoadingSpinner size="small" color="white" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    <span>Send</span>
+                  </motion.button>
+                </form>
+                <p className="text-xs text-gray-500 mt-3 text-center">
+                  Press Enter to send, Shift+Enter for new line. Alex analyzes your emotions to offer better support.
+                </p>
+              </div>
+            </div>
           </div>
+          {/* Sidebar for Analysis */}
+          <AnimatePresence>
+            {(showInsights || showContinuousAnalysis) && (
+              <motion.div
+                initial={{ opacity: 0, x: 300 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 300 }}
+                className="w-96 flex-shrink-0 space-y-6"
+              >
+                {/* Continuous Analysis Dashboard */}
+                {showContinuousAnalysis && continuousAssessment && (
+                  <ContinuousEmotionDashboard
+                    assessment={continuousAssessment}
+                    onExportData={exportData}
+                    onResetAnalysis={resetAnalysis}
+                  />
+                )}
+                {/* Basic Emotion Insights */}
+                {showInsights && latestUserMessage?.emotionAnalysis && (
+                  <EmotionInsights emotionAnalysis={latestUserMessage.emotionAnalysis} />
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </div>
