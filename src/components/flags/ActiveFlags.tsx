@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Flag, ArrowLeft, Users, Filter, Search, Clock, RefreshCw } from 'lucide-react';
+import { Flag, ArrowLeft, Users, Filter, Search, Clock, RefreshCw, AlertCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { useAuthStore } from '../../store/authStore';
@@ -29,11 +29,13 @@ interface Ticket {
   details: any;
   user_id: string;
   created_at: string;
+  status: string;
 }
 
 export function ActiveFlags() {
   const { user, profile } = useAuthStore();
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [allTickets, setAllTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState({
@@ -45,14 +47,18 @@ export function ActiveFlags() {
 
   useEffect(() => {
     fetchTickets();
-  }, [filters]);
+  }, []);
+
+  useEffect(() => {
+    applyFilters();
+  }, [filters, allTickets]);
 
   const fetchTickets = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      console.log('🎫 Fetching tickets with filters:', filters);
+      console.log('🎫 Starting ticket fetch process...');
       console.log('🔑 Current user ID:', user?.id);
       
       // Get the auth token from Supabase session
@@ -63,7 +69,7 @@ export function ActiveFlags() {
 
       console.log('🔐 Auth token exists:', !!session.access_token);
 
-      // Call the Edge Function with proper URL and filters
+      // Call the Edge Function with proper URL
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       if (!supabaseUrl) {
         throw new Error('Supabase URL not configured');
@@ -71,13 +77,25 @@ export function ActiveFlags() {
 
       console.log('🌐 Supabase URL:', supabaseUrl);
 
-      // Build query params for filtering
-      const params = new URLSearchParams();
-      if (filters.emotional_state) params.append('emotional_state', filters.emotional_state);
-      if (filters.need_tag) params.append('need_tag', filters.need_tag);
+      // First, let's try to fetch directly from the database to see what's there
+      console.log('🔍 Fetching tickets directly from database...');
+      const { data: directTickets, error: directError } = await supabase
+        .from('tickets')
+        .select('*')
+        .eq('status', 'open')
+        .order('created_at', { ascending: false });
 
-      const url = `${supabaseUrl}/functions/v1/list-tickets?${params.toString()}`;
-      console.log('📡 Calling URL:', url);
+      if (directError) {
+        console.error('❌ Direct database query error:', directError);
+      } else {
+        console.log('📊 Direct database results:', directTickets);
+        console.log('📊 Total tickets in database:', directTickets?.length || 0);
+        console.log('📊 User IDs in tickets:', directTickets?.map(t => t.user_id));
+      }
+
+      // Now try the edge function
+      const url = `${supabaseUrl}/functions/v1/list-tickets`;
+      console.log('📡 Calling Edge Function URL:', url);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -127,37 +145,13 @@ export function ActiveFlags() {
       }
 
       console.log('📊 Raw tickets from API:', result.tickets);
+      console.log('📊 Number of tickets from API:', result.tickets?.length || 0);
 
-      // Filter out user's own tickets and apply client-side filters
-      let filteredTickets = (result.tickets || []).filter((ticket: Ticket) => {
-        console.log('🔍 Checking ticket:', ticket.id, 'user_id:', ticket.user_id, 'current user:', user?.id);
-        return ticket.user_id !== user?.id;
-      });
-
-      console.log('🚫 After filtering out own tickets:', filteredTickets.length);
-
-      // Apply age range filter (client-side since it's not in the API yet)
-      if (filters.age_range) {
-        filteredTickets = filteredTickets.filter((ticket: Ticket) => 
-          ticket.age_range === filters.age_range
-        );
-        console.log('👥 After age filter:', filteredTickets.length);
-      }
-
-      // Apply search filter (client-side)
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        filteredTickets = filteredTickets.filter((ticket: Ticket) => 
-          ticket.display_name?.toLowerCase().includes(searchLower) ||
-          ticket.emotional_state?.toLowerCase().includes(searchLower) ||
-          ticket.need_tags?.some(tag => tag.toLowerCase().includes(searchLower)) ||
-          (ticket.details && typeof ticket.details === 'string' && ticket.details.toLowerCase().includes(searchLower))
-        );
-        console.log('🔍 After search filter:', filteredTickets.length);
-      }
-
-      setTickets(filteredTickets);
-      console.log('🎉 Final tickets loaded and filtered:', filteredTickets.length);
+      // Store all tickets for filtering
+      const rawTickets = result.tickets || [];
+      setAllTickets(rawTickets);
+      
+      console.log('🎉 All tickets stored:', rawTickets.length);
       
     } catch (err: any) {
       console.error('❌ Error fetching tickets:', err);
@@ -165,6 +159,65 @@ export function ActiveFlags() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const applyFilters = () => {
+    console.log('🔍 Applying filters to', allTickets.length, 'tickets');
+    console.log('🔍 Current user ID for filtering:', user?.id);
+    
+    let filteredTickets = [...allTickets];
+
+    // Filter out user's own tickets
+    const beforeOwnFilter = filteredTickets.length;
+    filteredTickets = filteredTickets.filter((ticket: Ticket) => {
+      const isOwnTicket = ticket.user_id === user?.id;
+      console.log(`🔍 Ticket ${ticket.id}: user_id=${ticket.user_id}, current_user=${user?.id}, isOwn=${isOwnTicket}`);
+      return !isOwnTicket;
+    });
+    console.log(`🚫 After filtering out own tickets: ${beforeOwnFilter} -> ${filteredTickets.length}`);
+
+    // Apply emotional state filter
+    if (filters.emotional_state) {
+      const beforeEmotionFilter = filteredTickets.length;
+      filteredTickets = filteredTickets.filter((ticket: Ticket) => 
+        ticket.emotional_state === filters.emotional_state
+      );
+      console.log(`😊 After emotion filter (${filters.emotional_state}): ${beforeEmotionFilter} -> ${filteredTickets.length}`);
+    }
+
+    // Apply need tag filter
+    if (filters.need_tag) {
+      const beforeNeedFilter = filteredTickets.length;
+      filteredTickets = filteredTickets.filter((ticket: Ticket) => 
+        ticket.need_tags?.includes(filters.need_tag)
+      );
+      console.log(`🏷️ After need filter (${filters.need_tag}): ${beforeNeedFilter} -> ${filteredTickets.length}`);
+    }
+
+    // Apply age range filter
+    if (filters.age_range) {
+      const beforeAgeFilter = filteredTickets.length;
+      filteredTickets = filteredTickets.filter((ticket: Ticket) => 
+        ticket.age_range === filters.age_range
+      );
+      console.log(`👥 After age filter (${filters.age_range}): ${beforeAgeFilter} -> ${filteredTickets.length}`);
+    }
+
+    // Apply search filter
+    if (filters.search) {
+      const beforeSearchFilter = filteredTickets.length;
+      const searchLower = filters.search.toLowerCase();
+      filteredTickets = filteredTickets.filter((ticket: Ticket) => 
+        ticket.display_name?.toLowerCase().includes(searchLower) ||
+        ticket.emotional_state?.toLowerCase().includes(searchLower) ||
+        ticket.need_tags?.some(tag => tag.toLowerCase().includes(searchLower)) ||
+        (typeof ticket.details === 'string' && ticket.details.toLowerCase().includes(searchLower))
+      );
+      console.log(`🔍 After search filter (${filters.search}): ${beforeSearchFilter} -> ${filteredTickets.length}`);
+    }
+
+    console.log('🎉 Final filtered tickets:', filteredTickets.length);
+    setTickets(filteredTickets);
   };
 
   const clearFilters = () => {
@@ -332,8 +385,17 @@ export function ActiveFlags() {
           {/* Debug Info */}
           {process.env.NODE_ENV === 'development' && (
             <div className="p-4 bg-yellow-50 border-b border-yellow-200">
-              <div className="text-xs text-yellow-800">
-                <strong>Debug Info:</strong> User ID: {user?.id} | Loading: {loading.toString()} | Error: {error || 'None'} | Tickets: {tickets.length}
+              <div className="text-xs text-yellow-800 space-y-1">
+                <div><strong>Debug Info:</strong></div>
+                <div>User ID: {user?.id}</div>
+                <div>Loading: {loading.toString()}</div>
+                <div>Error: {error || 'None'}</div>
+                <div>All Tickets: {allTickets.length}</div>
+                <div>Filtered Tickets: {tickets.length}</div>
+                <div>Has Active Filters: {hasActiveFilters.toString()}</div>
+                {allTickets.length > 0 && (
+                  <div>Sample Ticket User IDs: {allTickets.slice(0, 3).map(t => t.user_id).join(', ')}</div>
+                )}
               </div>
             </div>
           )}
@@ -347,14 +409,27 @@ export function ActiveFlags() {
               </div>
             ) : error ? (
               <div className="bg-red-100 text-red-700 rounded-xl p-4 text-center">
+                <AlertCircle className="w-8 h-8 mx-auto mb-2" />
                 <p className="font-medium mb-2">Error loading requests</p>
-                <p className="text-sm">{error}</p>
+                <p className="text-sm mb-4">{error}</p>
                 <button
                   onClick={fetchTickets}
-                  className="mt-3 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                  className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-all"
                 >
                   Try Again
                 </button>
+              </div>
+            ) : allTickets.length === 0 ? (
+              <div className="text-center py-12 text-gray-500">
+                <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <p className="text-lg font-semibold">No support requests in the database</p>
+                <p className="text-sm mb-4">Be the first to create a support request</p>
+                <Link
+                  to="/peer-matching"
+                  className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
+                >
+                  Create Support Request
+                </Link>
               </div>
             ) : tickets.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
@@ -372,8 +447,8 @@ export function ActiveFlags() {
                   </>
                 ) : (
                   <>
-                    <p className="text-lg font-semibold">No active support requests right now</p>
-                    <p className="text-sm mb-4">Check back soon or create your own request</p>
+                    <p className="text-lg font-semibold">No support requests available for you</p>
+                    <p className="text-sm mb-4">All current requests are your own or check back soon</p>
                     <Link
                       to="/peer-matching"
                       className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
@@ -388,6 +463,9 @@ export function ActiveFlags() {
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-sm text-gray-600">
                     {tickets.length} support request{tickets.length !== 1 ? 's' : ''} found
+                    {allTickets.length > tickets.length && (
+                      <span className="text-gray-400"> (filtered from {allTickets.length} total)</span>
+                    )}
                   </p>
                 </div>
 
@@ -420,7 +498,7 @@ export function ActiveFlags() {
                           </div>
                           
                           <div className="flex flex-wrap gap-2 mb-3">
-                            {ticket.need_tags.map(tag => (
+                            {ticket.need_tags && ticket.need_tags.map(tag => (
                               <span key={tag} className="text-xs bg-accent-100 text-accent-700 rounded-full px-3 py-1">
                                 {tag}
                               </span>
@@ -428,7 +506,9 @@ export function ActiveFlags() {
                           </div>
                           
                           {ticket.details && (
-                            <p className="text-sm text-gray-700 mb-4">{ticket.details}</p>
+                            <p className="text-sm text-gray-700 mb-4">
+                              {typeof ticket.details === 'string' ? ticket.details : JSON.stringify(ticket.details)}
+                            </p>
                           )}
                         </div>
                       </div>
