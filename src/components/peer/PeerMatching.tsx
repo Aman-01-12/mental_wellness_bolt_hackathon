@@ -34,6 +34,12 @@ export function PeerMatching() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // My tickets state
+  const [myTickets, setMyTickets] = useState<any[]>([]);
+  const [myTicketsLoading, setMyTicketsLoading] = useState(true);
+  const [myTicketsError, setMyTicketsError] = useState<string | null>(null);
+  const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
+
   const { register, handleSubmit, setValue, watch, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       display_name: profile?.display_name || '',
@@ -45,6 +51,71 @@ export function PeerMatching() {
   });
 
   const selectedTags = watch('need_tags') || [];
+
+  React.useEffect(() => {
+    const fetchMyTickets = async () => {
+      setMyTicketsLoading(true);
+      setMyTicketsError(null);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        if (!supabaseUrl) throw new Error('Supabase URL not configured');
+        const response = await fetch(`${supabaseUrl}/functions/v1/list-tickets`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorData;
+          try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
+          throw new Error(errorData.error || `HTTP ${response.status} error`);
+        }
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error || 'Failed to fetch tickets');
+        // Filter tickets to only those created by the current user
+        setMyTickets((result.tickets || []).filter((t: any) => t.user_id === profile?.id));
+      } catch (err: any) {
+        setMyTicketsError(err.message || 'Failed to load your tickets');
+      } finally {
+        setMyTicketsLoading(false);
+      }
+    };
+    if (profile?.id) fetchMyTickets();
+  }, [profile?.id]);
+
+  const handleWithdraw = async (ticketId: string) => {
+    setWithdrawingId(ticketId);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) throw new Error('Supabase URL not configured');
+      const response = await fetch(`${supabaseUrl}/functions/v1/withdraw-ticket`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ ticket_id: ticketId })
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
+        throw new Error(errorData.error || `HTTP ${response.status} error`);
+      }
+      // Remove withdrawn ticket from state
+      setMyTickets((prev) => prev.filter((t) => t.id !== ticketId));
+    } catch (err: any) {
+      alert(err.message || 'Failed to withdraw ticket');
+    } finally {
+      setWithdrawingId(null);
+    }
+  };
 
   const onSubmit = async (data: FormData) => {
     setLoading(true);
@@ -169,6 +240,50 @@ export function PeerMatching() {
             </div>
           </div>
 
+          {/* My Tickets Section */}
+          <div className="mb-10">
+            <h2 className="text-lg font-semibold text-primary-700 mb-2">My Active Flags</h2>
+            {myTicketsLoading ? (
+              <div className="text-gray-500 py-4">Loading your tickets...</div>
+            ) : myTicketsError ? (
+              <div className="bg-red-100 text-red-700 rounded-xl p-3 text-sm mb-2">{myTicketsError}</div>
+            ) : myTickets.length === 0 ? (
+              <div className="text-gray-500 py-4">You have no active help tickets.</div>
+            ) : (
+              <div className="grid gap-4">
+                {myTickets.map(ticket => (
+                  <div key={ticket.id} className="border border-gray-100 rounded-xl p-4 bg-gradient-to-br from-primary-50 to-secondary-50">
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="font-semibold text-primary-700">{ticket.display_name || 'Anonymous'}</span>
+                      {ticket.age_range && <span className="text-xs bg-primary-100 text-primary-700 rounded-full px-2 py-0.5 ml-2">{ticket.age_range}</span>}
+                      <span className="text-xs bg-secondary-100 text-secondary-700 rounded-full px-2 py-0.5 ml-2">{ticket.emotional_state}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-1">
+                      {ticket.need_tags && ticket.need_tags.map((tag: string) => (
+                        <span key={tag} className="text-xs bg-accent-100 text-accent-700 rounded-full px-2 py-0.5">{tag}</span>
+                      ))}
+                    </div>
+                    {ticket.details && ticket.details.extra && (
+                      <div className="text-sm text-gray-700 mb-1">{ticket.details.extra}</div>
+                    )}
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-xl text-xs font-medium transition-all disabled:opacity-60"
+                        onClick={() => handleWithdraw(ticket.id)}
+                        disabled={withdrawingId === ticket.id}
+                      >
+                        {withdrawingId === ticket.id ? 'Withdrawing...' : 'Withdraw'}
+                      </button>
+                    </div>
+
+                    {/* Incoming Match Requests Section */}
+                    <IncomingRequests ticketId={ticket.id} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 max-w-xl mx-auto">
             {/* Display Name */}
             <div>
@@ -280,6 +395,130 @@ export function PeerMatching() {
           </form>
         </motion.div>
       </div>
+    </div>
+  );
+}
+
+function IncomingRequests({ ticketId }: { ticketId: string }) {
+  const navigate = useNavigate();
+  const [requests, setRequests] = React.useState<any[]>([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [actionLoading, setActionLoading] = React.useState<string | null>(null); // requestId being acted on
+  const [actionError, setActionError] = React.useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const fetchRequests = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        if (!supabaseUrl) throw new Error('Supabase URL not configured');
+        const response = await fetch(`${supabaseUrl}/functions/v1/list-match-requests?ticket_id=${ticketId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (!response.ok) {
+          const errorText = await response.text();
+          let errorData;
+          try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
+          throw new Error(errorData.error || `HTTP ${response.status} error`);
+        }
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error || 'Failed to fetch match requests');
+        setRequests(result.requests || []);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load match requests');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRequests();
+  }, [ticketId]);
+
+  const handleAction = async (requestId: string, action: 'accept' | 'decline') => {
+    setActionLoading(requestId);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) throw new Error('Supabase URL not configured');
+      const response = await fetch(`${supabaseUrl}/functions/v1/${action}-match-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ request_id: requestId })
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
+        throw new Error(errorData.error || `HTTP ${response.status} error`);
+      }
+      const result = await response.json();
+      setActionSuccess(action === 'accept' ? 'Accepted!' : 'Declined');
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      // Redirect to chat if accepted and conversation_id is present
+      if (action === 'accept' && result.conversation_id && navigate) {
+        navigate(`/chat/${result.conversation_id}`);
+      }
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to process request');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  return (
+    <div className="mt-4">
+      <h4 className="text-sm font-semibold text-primary-600 mb-1">Incoming Match Requests</h4>
+      {loading ? (
+        <div className="text-xs text-gray-500">Loading requests...</div>
+      ) : error ? (
+        <div className="bg-red-100 text-red-700 rounded-xl p-2 text-xs mb-2">{error}</div>
+      ) : requests.length === 0 ? (
+        <div className="text-xs text-gray-500">No match requests yet.</div>
+      ) : (
+        <div className="space-y-2">
+          {requests.map((req) => (
+            <div key={req.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-3 py-2">
+              <div>
+                <span className="font-medium text-primary-700">{req.requester_display_name || 'Anonymous'}</span>
+                {req.requester_age_range && <span className="text-xs bg-primary-100 text-primary-700 rounded-full px-2 py-0.5 ml-2">{req.requester_age_range}</span>}
+                {req.requester_emotional_state && <span className="text-xs bg-secondary-100 text-secondary-700 rounded-full px-2 py-0.5 ml-2">{req.requester_emotional_state}</span>}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  className="bg-success-500 hover:bg-success-600 text-white px-3 py-1 rounded-xl text-xs font-medium transition-all disabled:opacity-60"
+                  onClick={() => handleAction(req.id, 'accept')}
+                  disabled={actionLoading === req.id}
+                >
+                  {actionLoading === req.id ? 'Accepting...' : 'Accept'}
+                </button>
+                <button
+                  className="bg-gray-300 hover:bg-gray-400 text-gray-800 px-3 py-1 rounded-xl text-xs font-medium transition-all disabled:opacity-60"
+                  onClick={() => handleAction(req.id, 'decline')}
+                  disabled={actionLoading === req.id}
+                >
+                  {actionLoading === req.id ? 'Declining...' : 'Decline'}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {actionError && <div className="bg-red-100 text-red-700 rounded-xl p-2 text-xs mt-2">{actionError}</div>}
+      {actionSuccess && <div className="text-green-600 text-xs mt-2">{actionSuccess}</div>}
     </div>
   );
 }

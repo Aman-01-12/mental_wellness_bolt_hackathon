@@ -83,9 +83,59 @@ serve(async (req: Request) => {
     });
   }
 
-  // (Optional) On acceptance, create a conversation
-  // You can add this logic here if you want to auto-create a chat
+  // On acceptance, create a conversation and return its ID
+  if (status === "accepted") {
+    // Fetch requester_id from match_requests
+    const { data: fullRequest, error: reqError } = await supabase
+      .from("match_requests")
+      .select("requester_id, ticket_id")
+      .eq("id", match_request_id)
+      .single();
+    if (reqError || !fullRequest) {
+      return new Response(JSON.stringify({ error: "Could not fetch requester info" }), {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    const requesterId = fullRequest.requester_id;
+    const ticketOwnerId = ticket.user_id;
+    // Check if a conversation already exists between these two users
+    let conversationId = null;
+    const { data: existingConv } = await supabase
+      .from("conversations")
+      .select("id, participant_ids")
+      .contains("participant_ids", [requesterId, ticketOwnerId])
+      .single();
+    if (existingConv && existingConv.id) {
+      conversationId = existingConv.id;
+    } else {
+      // Create a new conversation
+      const { data: newConv, error: convError } = await supabase
+        .from("conversations")
+        .insert([
+          {
+            participant_ids: [requesterId, ticketOwnerId],
+            type: "peer",
+            status: "active"
+          }
+        ])
+        .select()
+        .single();
+      if (convError || !newConv) {
+        return new Response(JSON.stringify({ error: convError?.message || "Failed to create conversation" }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      conversationId = newConv.id;
+    }
+    return new Response(JSON.stringify({ match_request: updatedRequest, conversation_id: conversationId }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
+  // If declined, just return the match request as before
   return new Response(JSON.stringify({ match_request: updatedRequest }), {
     status: 200,
     headers: { "Content-Type": "application/json" },

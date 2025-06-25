@@ -129,6 +129,14 @@ export function ActiveFlags() {
                 <p className="text-sm text-gray-500">Find people who need support right now</p>
               </div>
             </div>
+            <div className="flex-1 flex justify-end">
+              <Link
+                to="/peer-matching"
+                className="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-xl font-medium transition-all shadow-sm"
+              >
+                View My Flags
+              </Link>
+            </div>
           </div>
 
           {loading ? (
@@ -165,7 +173,10 @@ export function ActiveFlags() {
                   {ticket.details && ticket.details.extra && (
                     <div className="text-sm text-gray-700 mb-2">{ticket.details.extra}</div>
                   )}
-                  {/* (Optional) Add request to connect button here, except for user's own tickets */}
+                  {/* Request to Connect button, only for non-self tickets */}
+                  {user?.id !== ticket.user_id && (
+                    <RequestToConnectButton ticketId={ticket.id} />
+                  )}
                 </motion.div>
               ))}
             </div>
@@ -173,5 +184,61 @@ export function ActiveFlags() {
         </motion.div>
       </div>
     </div>
+  );
+}
+
+function RequestToConnectButton({ ticketId }: { ticketId: string }) {
+  const { user } = useAuthStore();
+  const [loading, setLoading] = React.useState(false);
+  const [success, setSuccess] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [requested, setRequested] = React.useState(false);
+
+  const handleRequest = async () => {
+    setLoading(true);
+    setError(null);
+    setSuccess(false);
+    try {
+      // Get auth token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) throw new Error('Supabase URL not configured');
+      // Call Edge Function to create match request
+      const response = await fetch(`${supabaseUrl}/functions/v1/create-match-request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ ticket_id: ticketId })
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorData;
+        try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
+        throw new Error(errorData.error || `HTTP ${response.status} error`);
+      }
+      setSuccess(true);
+      setRequested(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send request');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (requested) {
+    return <div className="mt-2 text-green-600 text-sm font-medium">Request sent!</div>;
+  }
+
+  return (
+    <button
+      className="mt-2 bg-accent-500 hover:bg-accent-600 text-white px-4 py-2 rounded-xl font-medium transition-all shadow-sm disabled:opacity-60"
+      onClick={handleRequest}
+      disabled={loading}
+    >
+      {loading ? 'Requesting...' : 'Request to Connect'}
+    </button>
   );
 }
