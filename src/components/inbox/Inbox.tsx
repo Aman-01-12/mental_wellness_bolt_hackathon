@@ -89,7 +89,7 @@ export function Inbox() {
               .from('users')
               .select('display_name')
               .eq('id', otherParticipantId)
-              .single();
+              .maybeSingle();
             
             if (userData) {
               otherParticipant = {
@@ -106,7 +106,7 @@ export function Inbox() {
             .eq('conversation_id', conv.id)
             .order('timestamp', { ascending: false })
             .limit(1)
-            .single();
+            .maybeSingle();
 
           return {
             ...conv,
