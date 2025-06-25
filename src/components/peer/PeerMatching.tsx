@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'framer-motion';
-import { Users, ArrowLeft, Search, Filter, Heart, Clock, User } from 'lucide-react';
+import { Users, ArrowLeft, Heart, Clock, User } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { useAuthStore } from '../../store/authStore';
@@ -28,33 +28,12 @@ interface FormData {
   details: string;
 }
 
-interface Ticket {
-  id: string;
-  display_name: string;
-  age_range: string | null;
-  emotional_state: string;
-  need_tags: string[];
-  details: any;
-  user_id: string;
-  created_at: string;
-}
-
 export function PeerMatching() {
   const navigate = useNavigate();
   const { profile } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'create' | 'browse' | 'my-tickets'>('browse');
+  const [activeTab, setActiveTab] = useState<'create' | 'my-tickets'>('create');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Browse tickets state
-  const [availableTickets, setAvailableTickets] = useState<Ticket[]>([]);
-  const [browsing, setBrowsing] = useState(false);
-  const [browseError, setBrowseError] = useState<string | null>(null);
-  const [filters, setFilters] = useState({
-    emotional_state: '',
-    need_tag: '',
-    age_range: ''
-  });
 
   // My tickets state
   const [myTickets, setMyTickets] = useState<any[]>([]);
@@ -74,65 +53,12 @@ export function PeerMatching() {
 
   const selectedTags = watch('need_tags') || [];
 
-  // Fetch available tickets for browsing
-  React.useEffect(() => {
-    if (activeTab === 'browse') {
-      fetchAvailableTickets();
-    }
-  }, [activeTab, filters]);
-
   // Fetch my tickets
   React.useEffect(() => {
     if (activeTab === 'my-tickets') {
       fetchMyTickets();
     }
   }, [activeTab]);
-
-  const fetchAvailableTickets = async () => {
-    setBrowsing(true);
-    setBrowseError(null);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
-      
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) throw new Error('Supabase URL not configured');
-
-      // Build query params for filtering
-      const params = new URLSearchParams();
-      if (filters.emotional_state) params.append('emotional_state', filters.emotional_state);
-      if (filters.need_tag) params.append('need_tag', filters.need_tag);
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/list-tickets?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorData;
-        try { errorData = JSON.parse(errorText); } catch { errorData = { error: errorText }; }
-        throw new Error(errorData.error || `HTTP ${response.status} error`);
-      }
-
-      const result = await response.json();
-      if (!result.success) throw new Error(result.error || 'Failed to fetch tickets');
-
-      // Filter out user's own tickets
-      const filteredTickets = (result.tickets || []).filter((ticket: Ticket) => 
-        ticket.user_id !== profile?.id
-      );
-
-      setAvailableTickets(filteredTickets);
-    } catch (err: any) {
-      setBrowseError(err.message || 'Failed to load available tickets');
-    } finally {
-      setBrowsing(false);
-    }
-  };
 
   const fetchMyTickets = async () => {
     setMyTicketsLoading(true);
@@ -292,7 +218,7 @@ export function PeerMatching() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
       <Navigation />
-      <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="max-w-4xl mx-auto px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -311,27 +237,22 @@ export function PeerMatching() {
                 <Users className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Peer Matching</h1>
-                <p className="text-sm text-gray-500">Connect with others who understand</p>
+                <h1 className="text-xl font-semibold text-gray-900">Support Requests</h1>
+                <p className="text-sm text-gray-500">Create and manage your support requests</p>
               </div>
+            </div>
+            <div className="flex-1 flex justify-end">
+              <Link
+                to="/active-flags"
+                className="bg-secondary-500 hover:bg-secondary-600 text-white px-4 py-2 rounded-xl font-medium transition-all shadow-sm"
+              >
+                Browse All Requests
+              </Link>
             </div>
           </div>
 
           {/* Tab Navigation */}
           <div className="flex border-b border-gray-100">
-            <button
-              onClick={() => setActiveTab('browse')}
-              className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
-                activeTab === 'browse'
-                  ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              <div className="flex items-center justify-center space-x-2">
-                <Search className="w-4 h-4" />
-                <span>Browse Support Requests</span>
-              </div>
-            </button>
             <button
               onClick={() => setActiveTab('create')}
               className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
@@ -362,113 +283,6 @@ export function PeerMatching() {
 
           {/* Tab Content */}
           <div className="p-6">
-            {/* Browse Tab */}
-            {activeTab === 'browse' && (
-              <div className="space-y-6">
-                {/* Filters */}
-                <div className="bg-gray-50 rounded-2xl p-4">
-                  <div className="flex items-center space-x-2 mb-4">
-                    <Filter className="w-4 h-4 text-gray-600" />
-                    <h3 className="font-medium text-gray-900">Filter Support Requests</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <select
-                      value={filters.emotional_state}
-                      onChange={(e) => setFilters(prev => ({ ...prev, emotional_state: e.target.value }))}
-                      className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    >
-                      <option value="">All Emotional States</option>
-                      {EMOTIONAL_STATES.map(state => (
-                        <option key={state} value={state}>{state}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={filters.need_tag}
-                      onChange={(e) => setFilters(prev => ({ ...prev, need_tag: e.target.value }))}
-                      className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    >
-                      <option value="">All Support Types</option>
-                      {NEED_TAGS.map(tag => (
-                        <option key={tag} value={tag}>{tag}</option>
-                      ))}
-                    </select>
-                    <select
-                      value={filters.age_range}
-                      onChange={(e) => setFilters(prev => ({ ...prev, age_range: e.target.value }))}
-                      className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                    >
-                      <option value="">All Age Ranges</option>
-                      {AGE_RANGES.map(range => (
-                        <option key={range} value={range}>{range}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Available Tickets */}
-                {browsing ? (
-                  <div className="flex justify-center py-12">
-                    <div className="text-gray-500">Loading support requests...</div>
-                  </div>
-                ) : browseError ? (
-                  <div className="bg-red-100 text-red-700 rounded-xl p-4 text-center">{browseError}</div>
-                ) : availableTickets.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-lg font-semibold">No support requests found</p>
-                    <p className="text-sm">Try adjusting your filters or check back later</p>
-                  </div>
-                ) : (
-                  <div className="grid gap-4">
-                    {availableTickets.map(ticket => (
-                      <motion.div
-                        key={ticket.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="border border-gray-200 rounded-2xl p-6 hover:shadow-md transition-all"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-3">
-                              <span className="font-semibold text-gray-900 text-lg">
-                                {ticket.display_name || 'Anonymous'}
-                              </span>
-                              {ticket.age_range && (
-                                <span className="text-xs bg-primary-100 text-primary-700 rounded-full px-3 py-1">
-                                  {ticket.age_range}
-                                </span>
-                              )}
-                              <span className="text-xs bg-secondary-100 text-secondary-700 rounded-full px-3 py-1">
-                                {ticket.emotional_state}
-                              </span>
-                              <div className="flex items-center text-xs text-gray-500">
-                                <Clock className="w-3 h-3 mr-1" />
-                                {getTimeAgo(ticket.created_at)}
-                              </div>
-                            </div>
-                            
-                            <div className="flex flex-wrap gap-2 mb-3">
-                              {ticket.need_tags.map(tag => (
-                                <span key={tag} className="text-xs bg-accent-100 text-accent-700 rounded-full px-3 py-1">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                            
-                            {ticket.details && (
-                              <p className="text-sm text-gray-700 mb-4">{ticket.details}</p>
-                            )}
-                          </div>
-                        </div>
-                        
-                        <RequestToConnectButton ticketId={ticket.id} />
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* Create Tab */}
             {activeTab === 'create' && (
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 max-w-2xl mx-auto">
@@ -670,85 +484,6 @@ export function PeerMatching() {
           </div>
         </motion.div>
       </div>
-    </div>
-  );
-}
-
-function RequestToConnectButton({ ticketId }: { ticketId: string }) {
-  const { user, profile } = useAuthStore();
-  const [loading, setLoading] = React.useState(false);
-  const [success, setSuccess] = React.useState(false);
-  const [error, setError] = React.useState<string | null>(null);
-  const [requested, setRequested] = React.useState(false);
-
-  const handleRequest = async () => {
-    setLoading(true);
-    setError(null);
-    setSuccess(false);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) throw new Error('Not authenticated. Please sign in again.');
-      
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) throw new Error('Supabase URL not configured');
-      
-      const response = await fetch(`${supabaseUrl}/functions/v1/create-match-request`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        body: JSON.stringify({ 
-          ticket_id: ticketId,
-          requester_display_name: profile?.display_name || 'Anonymous',
-          requester_need_tags: []
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorData;
-        try { 
-          errorData = JSON.parse(errorText); 
-        } catch { 
-          errorData = { error: errorText }; 
-        }
-        throw new Error(errorData.error || `HTTP ${response.status} error`);
-      }
-      
-      const result = await response.json();
-      if (!result.match_request) {
-        throw new Error('Failed to create match request');
-      }
-      
-      setSuccess(true);
-      setRequested(true);
-    } catch (err: any) {
-      setError(err.message || 'Failed to send request');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (requested) {
-    return <div className="text-green-600 text-sm font-medium">Request sent successfully!</div>;
-  }
-
-  return (
-    <div>
-      <button
-        className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-xl font-medium transition-all shadow-sm disabled:opacity-60"
-        onClick={handleRequest}
-        disabled={loading}
-      >
-        {loading ? 'Sending Request...' : 'Request to Connect'}
-      </button>
-      {error && (
-        <div className="mt-2 text-red-600 text-sm">{error}</div>
-      )}
-      {success && (
-        <div className="mt-2 text-green-600 text-sm">Request sent successfully!</div>
-      )}
     </div>
   );
 }
