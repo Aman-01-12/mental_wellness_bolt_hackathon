@@ -31,6 +31,7 @@ interface Message {
   content: string;
   timestamp: string;
   message_type: string;
+  isOptimistic?: boolean; // For optimistic updates
 }
 
 export function Inbox() {
@@ -79,7 +80,32 @@ export function Inbox() {
         },
         (payload) => {
           const newMessage = payload.new as Message;
-          setMessages(prev => [...prev, newMessage]);
+          
+          // Only add the message if it's not from the current user (to avoid duplicates)
+          // or if we don't already have an optimistic version
+          setMessages(prev => {
+            const hasOptimistic = prev.some(msg => 
+              msg.isOptimistic && 
+              msg.sender_id === newMessage.sender_id && 
+              msg.content === newMessage.content
+            );
+            
+            if (newMessage.sender_id === user?.id && hasOptimistic) {
+              // Replace optimistic message with real one
+              return prev.map(msg => 
+                msg.isOptimistic && 
+                msg.sender_id === newMessage.sender_id && 
+                msg.content === newMessage.content
+                  ? { ...newMessage, isOptimistic: false }
+                  : msg
+              );
+            } else if (newMessage.sender_id !== user?.id) {
+              // Add message from other user
+              return [...prev, newMessage];
+            }
+            
+            return prev;
+          });
           
           // Update conversation's last message
           setConversations(prev => prev.map(conv => 
@@ -101,7 +127,7 @@ export function Inbox() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [selectedConversation]);
+  }, [selectedConversation, user?.id]);
 
   const fetchConversations = async () => {
     setLoading(true);
@@ -202,6 +228,37 @@ export function Inbox() {
 
     setSendingMessage(true);
     const messageContent = newMessage.trim();
+    const tempId = `temp-${Date.now()}`;
+    const timestamp = new Date().toISOString();
+    
+    // Create optimistic message
+    const optimisticMessage: Message = {
+      id: tempId,
+      conversation_id: selectedConversation.id,
+      sender_id: user!.id,
+      content: messageContent,
+      timestamp,
+      message_type: 'text',
+      isOptimistic: true
+    };
+
+    // Add optimistic message immediately
+    setMessages(prev => [...prev, optimisticMessage]);
+    
+    // Update conversation's last message optimistically
+    setConversations(prev => prev.map(conv => 
+      conv.id === selectedConversation.id 
+        ? {
+            ...conv,
+            last_message: {
+              content: messageContent,
+              timestamp,
+              sender_id: user!.id
+            }
+          }
+        : conv
+    ));
+    
     setNewMessage(''); // Clear input immediately for better UX
     
     try {
@@ -227,11 +284,40 @@ export function Inbox() {
         throw new Error(errorData.error || 'Failed to send message');
       }
 
-      // Message will be added via real-time subscription
+      const result = await response.json();
+      
+      // Replace optimistic message with real message
+      if (result.success && result.message) {
+        setMessages(prev => prev.map(msg => 
+          msg.id === tempId 
+            ? { ...result.message, isOptimistic: false }
+            : msg
+        ));
+      }
       
     } catch (err: any) {
       console.error('Error sending message:', err);
-      setNewMessage(messageContent); // Restore message on error
+      
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== tempId));
+      
+      // Restore message in input
+      setNewMessage(messageContent);
+      
+      // Revert conversation last message
+      setConversations(prev => prev.map(conv => 
+        conv.id === selectedConversation.id 
+          ? {
+              ...conv,
+              last_message: messages.length > 0 ? {
+                content: messages[messages.length - 1].content,
+                timestamp: messages[messages.length - 1].timestamp,
+                sender_id: messages[messages.length - 1].sender_id
+              } : undefined
+            }
+          : conv
+      ));
+      
       alert(err.message || 'Failed to send message');
     } finally {
       setSendingMessage(false);
@@ -452,18 +538,25 @@ export function Inbox() {
                               <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`max-w-[70%] rounded-2xl px-4 py-3 shadow-sm ${
                                   isOwn
-                                    ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white'
+                                    ? message.isOptimistic 
+                                      ? 'bg-gradient-to-r from-primary-400 to-secondary-400 text-white opacity-70'
+                                      : 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white'
                                     : 'bg-white text-gray-900 border border-gray-100'
                                 }`}>
                                   <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
-                                  <p className={`text-xs mt-2 ${
-                                    isOwn ? 'text-white/70' : 'text-gray-500'
-                                  }`}>
-                                    {new Date(message.timestamp).toLocaleTimeString([], { 
-                                      hour: '2-digit', 
-                                      minute: '2-digit' 
-                                    })}
-                                  </p>
+                                  <div className="flex items-center justify-between mt-2">
+                                    <p className={`text-xs ${
+                                      isOwn ? 'text-white/70' : 'text-gray-500'
+                                    }`}>
+                                      {new Date(message.timestamp).toLocaleTimeString([], { 
+                                        hour: '2-digit', 
+                                        minute: '2-digit' 
+                                      })}
+                                    </p>
+                                    {message.isOptimistic && (
+                                      <span className="text-xs text-white/50 ml-2">Sending...</span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </div>
