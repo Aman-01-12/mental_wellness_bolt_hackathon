@@ -8,6 +8,7 @@ import { ChatInterface } from './components/chat/ChatInterface';
 import { PeerMatching } from './components/peer/PeerMatching';
 import { ProfilePage } from './components/profile/ProfilePage';
 import { ActiveFlags } from './components/flags/ActiveFlags';
+import { Inbox } from './components/inbox/Inbox';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
           <Route path="/chat/:conversationId" element={<ChatInterface />} />
           <Route path="/peer-matching" element={<PeerMatching />} />
           <Route path="/active-flags" element={<ActiveFlags />} />
+          <Route path="/inbox" element={<Inbox />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Routes>
       </div>

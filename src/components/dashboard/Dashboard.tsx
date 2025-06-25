@@ -34,6 +34,14 @@ export function Dashboard() {
       link: '/peer-matching'
     },
     {
+      title: 'Inbox',
+      description: 'View your peer support conversations',
+      icon: MessageCircle,
+      color: 'from-purple-500 to-purple-600',
+      bgColor: 'from-purple-50 to-purple-100',
+      link: '/inbox'
+    },
+    {
       title: 'My Profile',
       description: 'Update your preferences and privacy settings',
       icon: User,
@@ -73,7 +81,7 @@ export function Dashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12"
         >
           {quickActions.map((action, index) => {
             const Icon = action.icon;
