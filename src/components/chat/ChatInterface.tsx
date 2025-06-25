@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, ArrowLeft, Send, RotateCcw, AlertCircle, Heart, Brain, TrendingUp, Eye, EyeOff, Sparkles } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Bot, ArrowLeft, Send, RotateCcw, AlertCircle, Heart, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
+import { aiService, type ChatMessage } from '../../services/aiService';
 
 interface Message {
   id: string;
@@ -14,7 +15,6 @@ interface Message {
 }
 
 export function ChatInterface() {
-  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -64,41 +64,63 @@ export function ChatInterface() {
     setIsLoading(true);
     setIsTyping(true);
 
+    // Add typing indicator
+    const typingMessage: Message = {
+      id: 'typing',
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isTyping: true
+    };
+    setMessages(prev => [...prev, typingMessage]);
+
     try {
-      // Simulate AI response (replace with actual AI service call)
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-      
-      const responses = [
-        "I hear you. That sounds really challenging. How are you feeling about it right now?",
-        "Thank you for sharing that with me. What's been the most difficult part?",
-        "That makes a lot of sense. You're dealing with a lot. What kind of support would be most helpful?",
-        "I can understand why you'd feel that way. Have you been able to talk to anyone else about this?",
-        "It sounds like you're going through a tough time. What usually helps you when you're feeling like this?",
-        "That's a lot to process. Take your time - I'm here to listen. What's weighing on you most?",
-        "I appreciate you opening up about this. How long have you been feeling this way?",
-        "That sounds overwhelming. You're being really brave by reaching out. What would help right now?"
-      ];
-      
-      const aiMessage: Message = {
+      // Prepare conversation history for AI
+      const conversationHistory: ChatMessage[] = messages
+        .filter(msg => !msg.isTyping)
+        .map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }));
+
+      // Add the new user message
+      conversationHistory.push({
+        role: 'user',
+        content: message
+      });
+
+      // Get AI response
+      console.log('🤖 Getting AI response...');
+      const aiResponse = await aiService.sendMessage(conversationHistory);
+
+      // Remove typing indicator and add AI response
+      setIsTyping(false);
+      const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
-        content: responses[Math.floor(Math.random() * responses.length)],
+        content: aiResponse,
         timestamp: new Date()
       };
 
-      setMessages(prev => [...prev, aiMessage]);
+      setMessages(prev => prev.filter(msg => !msg.isTyping).concat(assistantMessage));
+
     } catch (err) {
-      setError('Sorry, I had trouble responding. Please try again.');
-      const errorMessage: Message = {
+      setIsTyping(false);
+      setMessages(prev => prev.filter(msg => !msg.isTyping));
+      
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send message';
+      setError(errorMessage);
+      
+      // Add a gentle error message
+      const errorChatMessage: Message = {
         id: `error-${Date.now()}`,
         role: 'assistant',
         content: "Sorry, I'm having some trouble right now. Can you try again? I'm still here 💙",
         timestamp: new Date()
       };
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev, errorChatMessage]);
     } finally {
       setIsLoading(false);
-      setIsTyping(false);
     }
   };
 
@@ -155,7 +177,7 @@ export function ChatInterface() {
                     <Sparkles className="w-4 h-4 text-primary-500" />
                   </h1>
                   <p className="text-sm text-gray-500">
-                    {isTyping ? 'Thinking...' : 'Your gentle AI companion • Adapts to you'}
+                    {isTyping ? 'Thinking...' : 'Your gentle AI companion • Powered by Gemini'}
                   </p>
                 </div>
               </div>
@@ -258,7 +280,7 @@ export function ChatInterface() {
                   value={inputValue}
                   onChange={(e) => setInputValue(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Share what's on your mind... Alex keeps responses gentle and easy to read 💙"
+                  placeholder="Share what's on your mind... Alex will respond with genuine care 💙"
                   className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors resize-none"
                   rows={1}
                   style={{
@@ -291,7 +313,7 @@ export function ChatInterface() {
             </form>
             
             <p className="text-xs text-gray-500 mt-3 text-center">
-              Press Enter to send, Shift+Enter for new line. Alex adapts to your style and keeps things gentle when you're upset.
+              Press Enter to send, Shift+Enter for new line. Alex is powered by Google Gemini AI.
             </p>
           </div>
         </div>
