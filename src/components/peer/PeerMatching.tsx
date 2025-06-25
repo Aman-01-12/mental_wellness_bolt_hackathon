@@ -566,9 +566,9 @@ function IncomingRequests({ ticketId }: { ticketId: string }) {
       setActionSuccess(action === 'accept' ? 'Accepted!' : 'Declined');
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
       
-      // Redirect to chat if accepted and conversation_id is present
-      if (action === 'accept' && result.conversation_id && navigate) {
-        navigate(`/chat/${result.conversation_id}`);
+      // Redirect to inbox (not AI chat) if accepted
+      if (action === 'accept') {
+        navigate('/inbox');
       }
     } catch (err: any) {
       setActionError(err.message || 'Failed to process request');

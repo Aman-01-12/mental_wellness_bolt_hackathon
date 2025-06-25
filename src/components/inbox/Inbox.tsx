@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { MessageCircle, ArrowLeft, Users, Clock, Send, MoreVertical } from 'lucide-react';
+import { MessageCircle, ArrowLeft, Users, Clock, Send, MoreVertical, Smile, Paperclip } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Navigation } from '../ui/Navigation';
 import { useAuthStore } from '../../store/authStore';
@@ -43,6 +43,8 @@ export function Inbox() {
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messageInputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -54,6 +56,51 @@ export function Inbox() {
     if (selectedConversation) {
       fetchMessages(selectedConversation.id);
     }
+  }, [selectedConversation]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Set up real-time subscription for messages
+  useEffect(() => {
+    if (!selectedConversation) return;
+
+    const channel = supabase
+      .channel(`messages:${selectedConversation.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${selectedConversation.id}`,
+        },
+        (payload) => {
+          const newMessage = payload.new as Message;
+          setMessages(prev => [...prev, newMessage]);
+          
+          // Update conversation's last message
+          setConversations(prev => prev.map(conv => 
+            conv.id === selectedConversation.id 
+              ? {
+                  ...conv,
+                  last_message: {
+                    content: newMessage.content,
+                    timestamp: newMessage.timestamp,
+                    sender_id: newMessage.sender_id
+                  }
+                }
+              : conv
+          ));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [selectedConversation]);
 
   const fetchConversations = async () => {
@@ -117,6 +164,11 @@ export function Inbox() {
       );
 
       setConversations(enrichedConversations);
+      
+      // Auto-select the first conversation if none is selected
+      if (enrichedConversations.length > 0 && !selectedConversation) {
+        setSelectedConversation(enrichedConversations[0]);
+      }
     } catch (err: any) {
       console.error('Error fetching conversations:', err);
       setError(err.message || 'Failed to load conversations');
@@ -149,6 +201,8 @@ export function Inbox() {
     if (!newMessage.trim() || !selectedConversation || sendingMessage) return;
 
     setSendingMessage(true);
+    const messageContent = newMessage.trim();
+    setNewMessage(''); // Clear input immediately for better UX
     
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -163,7 +217,7 @@ export function Inbox() {
         },
         body: JSON.stringify({
           conversation_id: selectedConversation.id,
-          content: newMessage.trim(),
+          content: messageContent,
           message_type: 'text'
         })
       });
@@ -173,28 +227,11 @@ export function Inbox() {
         throw new Error(errorData.error || 'Failed to send message');
       }
 
-      const result = await response.json();
+      // Message will be added via real-time subscription
       
-      // Add the new message to the messages list
-      setMessages(prev => [...prev, result.message]);
-      setNewMessage('');
-      
-      // Update the conversation's last message
-      setConversations(prev => prev.map(conv => 
-        conv.id === selectedConversation.id 
-          ? {
-              ...conv,
-              last_message: {
-                content: result.message.content,
-                timestamp: result.message.timestamp,
-                sender_id: result.message.sender_id
-              }
-            }
-          : conv
-      ));
-
     } catch (err: any) {
       console.error('Error sending message:', err);
+      setNewMessage(messageContent); // Restore message on error
       alert(err.message || 'Failed to send message');
     } finally {
       setSendingMessage(false);
@@ -224,7 +261,14 @@ export function Inbox() {
 
   const formatMessageTime = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const now = new Date();
+    const isToday = date.toDateString() === now.toDateString();
+    
+    if (isToday) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else {
+      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    }
   };
 
   return (
@@ -254,6 +298,14 @@ export function Inbox() {
                 <p className="text-sm text-gray-500">Your peer support conversations</p>
               </div>
             </div>
+            <div className="flex-1 flex justify-end">
+              <Link
+                to="/peer-matching"
+                className="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-xl font-medium transition-all shadow-sm"
+              >
+                New Request
+              </Link>
+            </div>
           </div>
 
           <div className="flex h-full">
@@ -261,6 +313,7 @@ export function Inbox() {
             <div className="w-1/3 border-r border-gray-100 flex flex-col">
               <div className="p-4 border-b border-gray-100">
                 <h2 className="font-semibold text-gray-900">Conversations</h2>
+                <p className="text-xs text-gray-500 mt-1">{conversations.length} active chat{conversations.length !== 1 ? 's' : ''}</p>
               </div>
               
               <div className="flex-1 overflow-y-auto">
@@ -273,10 +326,16 @@ export function Inbox() {
                 ) : conversations.length === 0 ? (
                   <div className="p-4 text-center text-gray-500">
                     <Users className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                    <p className="text-sm">No conversations yet</p>
+                    <p className="text-sm font-medium">No conversations yet</p>
                     <p className="text-xs text-gray-400 mt-1">
                       Accept connection requests to start chatting
                     </p>
+                    <Link
+                      to="/peer-matching"
+                      className="inline-block mt-3 text-xs text-primary-600 hover:text-primary-700 font-medium"
+                    >
+                      Create Support Request →
+                    </Link>
                   </div>
                 ) : (
                   <div className="space-y-1 p-2">
@@ -291,22 +350,25 @@ export function Inbox() {
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center space-x-2 mb-1">
+                              <div className="w-8 h-8 bg-gradient-to-br from-accent-500 to-primary-500 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <Users className="w-4 h-4 text-white" />
+                              </div>
                               <span className="font-medium text-gray-900 truncate">
                                 {conversation.other_participant?.display_name || 'Anonymous'}
                               </span>
                               {conversation.last_message && (
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-gray-500 flex-shrink-0">
                                   {getTimeAgo(conversation.last_message.timestamp)}
                                 </span>
                               )}
                             </div>
                             {conversation.last_message ? (
-                              <p className="text-sm text-gray-600 truncate">
+                              <p className="text-sm text-gray-600 truncate ml-10">
                                 {conversation.last_message.sender_id === user?.id ? 'You: ' : ''}
                                 {conversation.last_message.content}
                               </p>
                             ) : (
-                              <p className="text-sm text-gray-400 italic">No messages yet</p>
+                              <p className="text-sm text-gray-400 italic ml-10">No messages yet</p>
                             )}
                           </div>
                         </div>
@@ -324,14 +386,14 @@ export function Inbox() {
                   {/* Chat Header */}
                   <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-gradient-to-br from-accent-500 to-primary-500 rounded-xl flex items-center justify-center">
-                        <Users className="w-4 h-4 text-white" />
+                      <div className="w-10 h-10 bg-gradient-to-br from-accent-500 to-primary-500 rounded-xl flex items-center justify-center">
+                        <Users className="w-5 h-5 text-white" />
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900">
                           {selectedConversation.other_participant?.display_name || 'Anonymous'}
                         </h3>
-                        <p className="text-xs text-gray-500">Peer Support Chat</p>
+                        <p className="text-xs text-gray-500">Peer Support Chat • Started {formatMessageTime(selectedConversation.started_at)}</p>
                       </div>
                     </div>
                     <button className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-all">
@@ -347,69 +409,125 @@ export function Inbox() {
                       </div>
                     ) : messages.length === 0 ? (
                       <div className="text-center py-8 text-gray-500">
-                        <MessageCircle className="w-8 h-8 mx-auto mb-2 text-gray-300" />
-                        <p className="text-sm">Start the conversation!</p>
-                        <p className="text-xs text-gray-400 mt-1">
+                        <MessageCircle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <p className="text-lg font-semibold">Start the conversation!</p>
+                        <p className="text-sm text-gray-400 mt-1">
                           Send a message to begin your peer support chat
                         </p>
+                        <div className="mt-4 p-4 bg-primary-50 rounded-xl max-w-md mx-auto">
+                          <p className="text-xs text-primary-700">
+                            💡 <strong>Tip:</strong> Be kind, respectful, and supportive. Remember that both of you are here to help each other.
+                          </p>
+                        </div>
                       </div>
                     ) : (
-                      messages.map((message) => (
-                        <div
-                          key={message.id}
-                          className={`flex ${message.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                              message.sender_id === user?.id
-                                ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white'
-                                : 'bg-gray-100 text-gray-900'
-                            }`}
-                          >
-                            <p className="text-sm">{message.content}</p>
-                            <p className={`text-xs mt-1 ${
-                              message.sender_id === user?.id ? 'text-white/70' : 'text-gray-500'
-                            }`}>
-                              {formatMessageTime(message.timestamp)}
-                            </p>
-                          </div>
-                        </div>
-                      ))
+                      <>
+                        {messages.map((message, index) => {
+                          const isOwn = message.sender_id === user?.id;
+                          const showTimestamp = index === 0 || 
+                            new Date(message.timestamp).getTime() - new Date(messages[index - 1].timestamp).getTime() > 300000; // 5 minutes
+                          
+                          return (
+                            <div key={message.id}>
+                              {showTimestamp && (
+                                <div className="text-center my-4">
+                                  <span className="text-xs text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                                    {formatMessageTime(message.timestamp)}
+                                  </span>
+                                </div>
+                              )}
+                              <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-[70%] rounded-2xl px-4 py-3 ${
+                                  isOwn
+                                    ? 'bg-gradient-to-r from-primary-500 to-secondary-500 text-white'
+                                    : 'bg-gray-100 text-gray-900'
+                                }`}>
+                                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                                  <p className={`text-xs mt-1 ${
+                                    isOwn ? 'text-white/70' : 'text-gray-500'
+                                  }`}>
+                                    {new Date(message.timestamp).toLocaleTimeString([], { 
+                                      hour: '2-digit', 
+                                      minute: '2-digit' 
+                                    })}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        <div ref={messagesEndRef} />
+                      </>
                     )}
                   </div>
 
                   {/* Message Input */}
                   <div className="p-4 border-t border-gray-100">
-                    <div className="flex space-x-3">
-                      <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyPress={handleKeyPress}
-                        placeholder="Type your message..."
-                        className="flex-1 px-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-                        disabled={sendingMessage}
-                      />
+                    <div className="flex space-x-3 items-end">
+                      <div className="flex-1 relative">
+                        <textarea
+                          ref={messageInputRef}
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          onKeyPress={handleKeyPress}
+                          placeholder="Type your message... (Press Enter to send, Shift+Enter for new line)"
+                          className="w-full px-4 py-3 pr-12 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors resize-none"
+                          rows={1}
+                          style={{
+                            minHeight: '48px',
+                            maxHeight: '120px',
+                            height: 'auto'
+                          }}
+                          onInput={(e) => {
+                            const target = e.target as HTMLTextAreaElement;
+                            target.style.height = 'auto';
+                            target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
+                          }}
+                          disabled={sendingMessage}
+                        />
+                        <div className="absolute right-3 bottom-3 flex space-x-1">
+                          <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
+                            <Smile className="w-4 h-4" />
+                          </button>
+                          <button className="p-1 text-gray-400 hover:text-gray-600 transition-colors">
+                            <Paperclip className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
                       <button
                         onClick={sendMessage}
                         disabled={!newMessage.trim() || sendingMessage}
-                        className="px-4 py-2 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+                        className="px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-2xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                       >
                         {sendingMessage ? (
                           <LoadingSpinner size="small" color="white" />
                         ) : (
                           <Send className="w-4 h-4" />
                         )}
+                        <span>Send</span>
                       </button>
+                    </div>
+                    
+                    <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+                      <span>Be kind and supportive in your conversations</span>
+                      <span>{newMessage.length}/1000</span>
                     </div>
                   </div>
                 </>
               ) : (
                 <div className="flex-1 flex items-center justify-center text-gray-500">
                   <div className="text-center">
-                    <MessageCircle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-lg font-semibold">Select a conversation</p>
-                    <p className="text-sm text-gray-400">Choose a conversation from the list to start chatting</p>
+                    <MessageCircle className="w-16 h-16 mx-auto mb-4 text-gray-300" />
+                    <p className="text-xl font-semibold mb-2">Select a conversation</p>
+                    <p className="text-sm text-gray-400 mb-6">Choose a conversation from the list to start chatting</p>
+                    {conversations.length === 0 && (
+                      <Link
+                        to="/peer-matching"
+                        className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
+                      >
+                        Create Support Request
+                      </Link>
+                    )}
                   </div>
                 </div>
               )}
