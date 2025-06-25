@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, Users, Bot, X, Heart, Brain } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { emotionService, type EmotionAnalysis } from '../../services/emotionService';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
@@ -181,7 +181,7 @@ export function EmotionAssessmentModal({
       console.log('🎉 Ticket created successfully from modal:', result.ticket);
       setShowTicketModal(false);
       onClose();
-      navigate('/active-flags');
+      navigate('/peer-matching');
       
     } catch (err: any) {
       console.error('❌ Error creating ticket from modal:', err);

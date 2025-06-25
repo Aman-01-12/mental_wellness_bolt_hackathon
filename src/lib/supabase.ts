@@ -38,6 +38,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
     detectSessionInUrl: true,
     flowType: 'pkce'
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
+  },
+  global: {
+    headers: {
+      'X-Client-Info': 'mindspace-app'
+    }
   }
 })
 
@@ -47,6 +57,10 @@ supabase.auth.onAuthStateChange((event, session) => {
     console.log('Token refreshed successfully')
   } else if (event === 'SIGNED_OUT') {
     console.log('User signed out')
+    // Disconnect realtime when user signs out
+    supabase.removeAllChannels()
+  } else if (event === 'SIGNED_IN') {
+    console.log('User signed in')
   }
 })
 

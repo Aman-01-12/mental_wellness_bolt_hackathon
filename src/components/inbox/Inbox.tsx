@@ -53,8 +53,10 @@ export function Inbox() {
   const [error, setError] = useState<string | null>(null);
   const [nameReveals, setNameReveals] = useState<NameReveal[]>([]);
   const [revealingName, setRevealingName] = useState(false);
+  const [realtimeConnected, setRealtimeConnected] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messageInputRef = useRef<HTMLTextAreaElement>(null);
+  const channelRef = useRef<any>(null);
 
   useEffect(() => {
     if (user?.id) {
@@ -74,12 +76,25 @@ export function Inbox() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Set up real-time subscription for messages
+  // Set up real-time subscription for messages with better error handling
   useEffect(() => {
-    if (!selectedConversation) return;
+    if (!selectedConversation || !user?.id) return;
+
+    // Clean up previous channel
+    if (channelRef.current) {
+      supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    console.log('🔄 Setting up realtime subscription for conversation:', selectedConversation.id);
 
     const channel = supabase
-      .channel(`messages:${selectedConversation.id}`)
+      .channel(`messages:${selectedConversation.id}`, {
+        config: {
+          broadcast: { self: false },
+          presence: { key: user.id }
+        }
+      })
       .on(
         'postgres_changes',
         {
@@ -89,6 +104,7 @@ export function Inbox() {
           filter: `conversation_id=eq.${selectedConversation.id}`,
         },
         (payload) => {
+          console.log('📨 Received new message via realtime:', payload);
           const newMessage = payload.new as Message;
           
           // Only add the message if it's not from the current user (to avoid duplicates)
@@ -132,10 +148,42 @@ export function Inbox() {
           ));
         }
       )
-      .subscribe();
+      .on('system', {}, (payload) => {
+        console.log('🔌 Realtime system event:', payload);
+        if (payload.event === 'connected') {
+          setRealtimeConnected(true);
+          console.log('✅ Realtime connected successfully');
+        } else if (payload.event === 'disconnected') {
+          setRealtimeConnected(false);
+          console.log('❌ Realtime disconnected');
+        }
+      })
+      .subscribe((status) => {
+        console.log('📡 Realtime subscription status:', status);
+        if (status === 'SUBSCRIBED') {
+          setRealtimeConnected(true);
+          console.log('✅ Successfully subscribed to realtime updates');
+        } else if (status === 'CHANNEL_ERROR') {
+          setRealtimeConnected(false);
+          console.error('❌ Realtime channel error');
+        } else if (status === 'TIMED_OUT') {
+          setRealtimeConnected(false);
+          console.error('❌ Realtime subscription timed out');
+        } else if (status === 'CLOSED') {
+          setRealtimeConnected(false);
+          console.log('🔌 Realtime channel closed');
+        }
+      });
+
+    channelRef.current = channel;
 
     return () => {
-      supabase.removeChannel(channel);
+      console.log('🧹 Cleaning up realtime subscription');
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+      setRealtimeConnected(false);
     };
   }, [selectedConversation, user?.id]);
 
@@ -520,7 +568,19 @@ export function Inbox() {
                 </div>
                 <div>
                   <h1 className="text-xl font-semibold text-gray-900">Inbox</h1>
-                  <p className="text-sm text-gray-500">Your peer support conversations</p>
+                  <p className="text-sm text-gray-500 flex items-center space-x-2">
+                    <span>Your peer support conversations</span>
+                    {selectedConversation && (
+                      <span className={`inline-flex items-center space-x-1 text-xs ${
+                        realtimeConnected ? 'text-green-600' : 'text-orange-600'
+                      }`}>
+                        <div className={`w-2 h-2 rounded-full ${
+                          realtimeConnected ? 'bg-green-500' : 'bg-orange-500'
+                        }`} />
+                        <span>{realtimeConnected ? 'Live' : 'Connecting...'}</span>
+                      </span>
+                    )}
+                  </p>
                 </div>
               </div>
             </div>
@@ -619,13 +679,21 @@ export function Inbox() {
                         <h3 className="font-semibold text-gray-900">
                           {getRevealedName(selectedConversation.other_participant?.id || '') || selectedConversation.other_participant?.display_name || 'Anonymous'}
                         </h3>
-                        <p className="text-xs text-gray-500">
-                          Peer Support • Active now
+                        <p className="text-xs text-gray-500 flex items-center space-x-2">
+                          <span>Peer Support</span>
+                          <span className={`inline-flex items-center space-x-1 ${
+                            realtimeConnected ? 'text-green-600' : 'text-orange-600'
+                          }`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${
+                              realtimeConnected ? 'bg-green-500' : 'bg-orange-500'
+                            }`} />
+                            <span>{realtimeConnected ? 'Live updates' : 'Connecting...'}</span>
+                          </span>
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      {/* Reveal Name Toggle Button - ALWAYS VISIBLE FOR DEVELOPMENT */}
+                      {/* Reveal Name Toggle Button */}
                       {profile?.display_name && (
                         <motion.button
                           whileHover={{ scale: 1.05 }}
@@ -746,7 +814,7 @@ export function Inbox() {
                     )}
                   </div>
 
-                  {/* Message Input - FIXED AND ALWAYS VISIBLE */}
+                  {/* Message Input */}
                   <div className="p-6 bg-white border-t border-gray-200 flex-shrink-0">
                     <div className="flex items-end space-x-4">
                       {/* Attachment Button */}
@@ -754,7 +822,7 @@ export function Inbox() {
                         <Paperclip className="w-5 h-5" />
                       </button>
 
-                      {/* Message Input Container - ENHANCED VISIBILITY */}
+                      {/* Message Input Container */}
                       <div className="flex-1 relative">
                         <div className="flex items-end bg-gray-100 rounded-3xl px-5 py-3 border-2 border-transparent focus-within:border-primary-300 transition-all">
                           <textarea
@@ -784,7 +852,7 @@ export function Inbox() {
                         </div>
                       </div>
 
-                      {/* Send Button - ENHANCED VISIBILITY */}
+                      {/* Send Button */}
                       <button
                         onClick={sendMessage}
                         disabled={!newMessage.trim() || sendingMessage}
@@ -802,12 +870,15 @@ export function Inbox() {
                       </button>
                     </div>
                     
-                    {/* Character Count and Tips - ALWAYS VISIBLE */}
+                    {/* Character Count and Tips */}
                     <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
                       <span className="flex items-center space-x-4">
                         <span>Press Enter to send, Shift+Enter for new line</span>
                         {newMessage.trim() && (
                           <span className="text-primary-600 font-medium">Ready to send!</span>
+                        )}
+                        {!realtimeConnected && (
+                          <span className="text-orange-600 font-medium">⚠️ Connection issues - messages may be delayed</span>
                         )}
                       </span>
                       <span className={newMessage.length > 900 ? 'text-orange-500 font-medium' : ''}>
