@@ -11,6 +11,7 @@ import { ProfilePage } from './components/profile/ProfilePage';
 import { ActiveFlags } from './components/flags/ActiveFlags';
 import { Inbox } from './components/inbox/Inbox';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
+import { supabase } from './lib/supabase';
 
 function App() {
   const { user, loading, initialized, onboardingCompleted, initializeAuth } = useAuthStore();
@@ -67,5 +68,16 @@ function App() {
     </Router>
   );
 }
+
+useEffect(() => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'SIGNED_OUT' || session === null) {
+      window.location.href = '/auth';
+    }
+  });
+  return () => {
+    subscription.unsubscribe();
+  };
+}, []);
 
 export default App;
