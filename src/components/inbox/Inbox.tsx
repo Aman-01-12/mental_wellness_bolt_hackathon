@@ -6,6 +6,7 @@ import { Navigation } from '../ui/Navigation';
 import { useAuthStore } from '../../store/authStore';
 import { supabase } from '../../lib/supabase';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 interface Conversation {
   id: string;
@@ -160,6 +161,28 @@ export function Inbox() {
             >
               Sign In
             </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error if realtime subscription fails
+  if (error?.toLowerCase().includes('real-time') || error?.toLowerCase().includes('timed out') || error?.toLowerCase().includes('closed')) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+        <Navigation />
+        <div className="max-w-4xl mx-auto px-4 py-8">
+          <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
+            <AlertCircle className="w-16 h-16 mx-auto mb-4 text-error-400" />
+            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Realtime Connection Error</h2>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
+            >
+              Retry
+            </button>
           </div>
         </div>
       </div>

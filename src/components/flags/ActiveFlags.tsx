@@ -59,6 +59,16 @@ export function ActiveFlags() {
     applyFilters();
   }, [filters, allTickets]);
 
+  // Helper: Wait for session to be ready, retry up to 5 times
+  const getSessionWithRetry = async (retries = 5, delay = 400): Promise<any> => {
+    for (let i = 0; i < retries; i++) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.access_token) return session;
+      await new Promise(res => setTimeout(res, delay));
+    }
+    return null;
+  };
+
   const fetchTickets = async () => {
     if (!user?.id) {
       setError('Please sign in to view support requests');
@@ -72,8 +82,8 @@ export function ActiveFlags() {
     try {
       console.log('🎫 Starting ticket fetch process...');
       
-      // Get the auth token from Supabase session
-      const { data: { session } } = await supabase.auth.getSession();
+      // Wait for session to be ready, retry if needed
+      const session = await getSessionWithRetry();
       if (!session?.access_token) {
         throw new Error('No authentication session found. Please sign in again.');
       }
@@ -245,8 +255,8 @@ export function ActiveFlags() {
     );
   }
 
-  // Show sign-in prompt if user is not authenticated
-  if (!user) {
+  // Show sign-in prompt if user is not authenticated or session is missing
+  if (!user || error?.includes('sign in')) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
         <Navigation />
@@ -254,7 +264,7 @@ export function ActiveFlags() {
           <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
             <AlertCircle className="w-16 h-16 mx-auto mb-4 text-gray-400" />
             <h2 className="text-2xl font-semibold text-gray-900 mb-2">Sign In Required</h2>
-            <p className="text-gray-600 mb-6">Please sign in to view active support requests</p>
+            <p className="text-gray-600 mb-6">You need to be signed in to view support requests.</p>
             <Link
               to="/auth"
               className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
