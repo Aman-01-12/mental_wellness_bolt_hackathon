@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import { AuthPage } from './components/auth/AuthPage';
 import { OnboardingFlow } from './components/onboarding/OnboardingFlow';
@@ -13,13 +13,33 @@ import { Inbox } from './components/inbox/Inbox';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 import { supabase } from './lib/supabase';
 
-function App() {
+function AppContent() {
   const { user, loading, initialized, onboardingCompleted, initializeAuth } = useAuthStore();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Initialize auth on app start
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
+
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'SIGNED_OUT' || session === null) && window.location.pathname !== '/auth') {
+        window.location.href = '/auth';
+      }
+    });
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  // Redirect authenticated users away from /auth
+  useEffect(() => {
+    if (user && location.pathname === '/auth') {
+      navigate('/', { replace: true });
+    }
+  }, [user, location, navigate]);
 
   // Show loading spinner while initializing
   if (!initialized || loading) {
@@ -35,49 +55,35 @@ function App() {
 
   // Show auth page if not authenticated
   if (!user) {
-    return (
-      <Router>
-        <AuthPage />
-      </Router>
-    );
+    return <AuthPage />;
   }
 
   // Show onboarding if not completed
   if (!onboardingCompleted) {
-    return (
-      <Router>
-        <OnboardingFlow />
-      </Router>
-    );
+    return <OnboardingFlow />;
   }
 
   // Show main app
   return (
-    <Router>
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/chat" element={<AIChatInterface />} />
-          <Route path="/chat/:conversationId" element={<PeerChatInterface />} />
-          <Route path="/peer-matching" element={<PeerMatching />} />
-          <Route path="/active-flags" element={<ActiveFlags />} />
-          <Route path="/inbox" element={<Inbox />} />
-          <Route path="/profile" element={<ProfilePage />} />
-        </Routes>
-      </div>
-    </Router>
+    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/chat" element={<AIChatInterface />} />
+        <Route path="/chat/:conversationId" element={<PeerChatInterface />} />
+        <Route path="/peer-matching" element={<PeerMatching />} />
+        <Route path="/active-flags" element={<ActiveFlags />} />
+        <Route path="/inbox" element={<Inbox />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/auth" element={<AuthPage />} />
+      </Routes>
+    </div>
   );
 }
 
-useEffect(() => {
-  const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-    if (event === 'SIGNED_OUT' || session === null) {
-      window.location.href = '/auth';
-    }
-  });
-  return () => {
-    subscription.unsubscribe();
-  };
-}, []);
-
-export default App;
+export default function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
+  );
+}
