@@ -24,6 +24,7 @@ export function PeerChatInterface() {
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const draftKey = conversationId ? `chatDraft-${conversationId}` : undefined;
 
   // Fetch conversation and messages
   useEffect(() => {
@@ -93,6 +94,22 @@ export function PeerChatInterface() {
     };
   }, [conversationId, user]);
 
+  // Restore draft on mount or conversationId change
+  useEffect(() => {
+    if (!draftKey) return;
+    const savedDraft = localStorage.getItem(draftKey);
+    if (savedDraft !== null) {
+      setInputValue(savedDraft);
+    }
+  }, [draftKey]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputValue(e.target.value);
+    if (draftKey) {
+      localStorage.setItem(draftKey, e.target.value);
+    }
+  };
+
   // Send a new message
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,6 +132,9 @@ export function PeerChatInterface() {
       if (sendErr) throw sendErr;
       setMessages((prev) => [...prev, msg]);
       setInputValue('');
+      if (draftKey) {
+        localStorage.removeItem(draftKey);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to send message');
     } finally {
@@ -190,7 +210,7 @@ export function PeerChatInterface() {
               <div className="flex-1 relative">
                 <textarea
                   value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
+                  onChange={handleInputChange}
                   placeholder="Type your message..."
                   className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors resize-none"
                   rows={1}

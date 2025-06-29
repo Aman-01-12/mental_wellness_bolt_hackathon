@@ -12,6 +12,11 @@ import { ActiveFlags } from './components/flags/ActiveFlags';
 import { Inbox } from './components/inbox/Inbox';
 import { LoadingSpinner } from './components/ui/LoadingSpinner';
 import { supabase } from './lib/supabase';
+import { startInboxRealtime, stopInboxRealtime } from './lib/inboxRealtime';
+import { useInboxStore } from './store/inboxStore';
+import { refetchInboxConversations } from './lib/inboxFetch';
+import { refetchRequests } from './lib/requestsFetch';
+import { refetchTickets } from './lib/ticketsFetch';
 
 function AppContent() {
   const { user, loading, initialized, onboardingCompleted, initializeAuth } = useAuthStore();
@@ -40,6 +45,42 @@ function AppContent() {
       navigate('/', { replace: true });
     }
   }, [user, location, navigate]);
+
+  useEffect(() => {
+    if (user) {
+      startInboxRealtime(user.id);
+    } else {
+      stopInboxRealtime();
+      useInboxStore.getState().clear();
+    }
+    // Cleanup on unmount
+    return () => {
+      stopInboxRealtime();
+    };
+  }, [user]);
+
+  // Restore last route after reload
+  useEffect(() => {
+    const lastRoute = localStorage.getItem('lastRoute');
+    if (lastRoute && window.location.pathname !== lastRoute) {
+      localStorage.removeItem('lastRoute');
+      window.location.replace(lastRoute);
+    }
+  }, []);
+
+  // Hard refresh on tab switch (visibilitychange)
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        localStorage.setItem('lastRoute', window.location.pathname + window.location.search);
+        window.location.reload();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
 
   // Show loading spinner while initializing
   if (!initialized || loading) {

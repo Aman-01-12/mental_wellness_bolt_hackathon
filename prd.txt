@@ -70,10 +70,11 @@ The app brings people together to share their feelings, connect with others in s
 - Adapts tone and style to user's personality and preferences.
 - Available 24/7 as an emotional companion.
 - **Powered by Qwen2.5 72B Instruct (OpenRouter API)** for all chatbot interactions.
+- stores the chat in database in different table(ai_chat table)
 
 **Emotional State Assessment**
 - All emotional assessments are performed within the AI companion chat.
-- Continuously analyzes user input for emotional state using NLP and sentiment/emotion models.
+- analyzes batch of user input which are multiple of five(5,10,15,...) for emotional state using NLP and sentiment/emotion models.
 - Initial assessment triggers a pop-up:  
   - Option 1: Continue with AI companion  
   - Option 2: Get matched with a peer
@@ -104,7 +105,7 @@ The app brings people together to share their feelings, connect with others in s
 **Matching Workflow**
 1. After initial AI assessment (or major/emergent event), user can choose to be matched with a peer.
 2. System creates a "flag" or "ticket" for the user, containing:
-   - Anonymous display name
+   - display name
    - Age range
    - Emotional state (as assessed by AI)
    - User's need (e.g., listener, advice, gossip, rant, vent, "spill tea", "just vibe", "need hype", etc.)

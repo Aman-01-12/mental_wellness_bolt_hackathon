@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { motion } from 'framer-motion';
 import { Users, ArrowLeft, Heart, Clock, User } from 'lucide-react';
@@ -55,13 +55,48 @@ export function PeerMatching() {
   const selectedTags = watch('need_tags') || [];
 
   // Fetch my tickets when tab changes
-  React.useEffect(() => {
-    if (activeTab === 'my-tickets' && initialized) {
+  useEffect(() => {
+    if (activeTab === 'my-tickets' && profile?.id && initialized) {
       fetchMyTickets();
     }
-  }, [activeTab, initialized]);
+  }, [activeTab, profile?.id, initialized]);
+
+  // Restore active tab from localStorage on mount
+  useEffect(() => {
+    const savedTab = localStorage.getItem('peer-matching-tab');
+    if (savedTab === 'create' || savedTab === 'my-tickets') {
+      setActiveTab(savedTab);
+    }
+  }, []);
+
+  // Save active tab to localStorage on change
+  useEffect(() => {
+    localStorage.setItem('peer-matching-tab', activeTab);
+  }, [activeTab]);
+
+  // Restore form state from localStorage on mount
+  useEffect(() => {
+    const savedForm = localStorage.getItem('peer-matching-form');
+    if (savedForm) {
+      try {
+        const values = JSON.parse(savedForm);
+        Object.entries(values).forEach(([key, value]) => {
+          setValue(key as any, value);
+        });
+      } catch {}
+    }
+  }, [setValue]);
+
+  // Save form state to localStorage on change
+  useEffect(() => {
+    const subscription = watch((values) => {
+      localStorage.setItem('peer-matching-form', JSON.stringify(values));
+    });
+    return () => subscription.unsubscribe();
+  }, [watch]);
 
   const fetchMyTickets = async () => {
+    if (!profile?.id || !initialized) return;
     setMyTicketsLoading(true);
     setMyTicketsError(null);
     try {
@@ -185,6 +220,7 @@ export function PeerMatching() {
       // Switch to my-tickets tab to show the created ticket
       setActiveTab('my-tickets');
       
+      localStorage.removeItem('peer-matching-form');
     } catch (err: any) {
       console.error('❌ Error creating ticket:', err);
       setError(err.message || 'Something went wrong while creating your ticket');
@@ -529,6 +565,10 @@ function IncomingRequests({ ticketId }: { ticketId: string }) {
   const [actionSuccess, setActionSuccess] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    if (!ticketId) return;
+    // Add global auth state check
+    const { user, initialized } = useAuthStore.getState();
+    if (!user?.id || !initialized) return;
     const fetchRequests = async () => {
       setLoading(true);
       setError(null);

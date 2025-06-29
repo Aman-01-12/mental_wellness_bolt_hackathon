@@ -91,6 +91,61 @@ export type Database = {
           updated_at?: string;
         };
       };
+      messages: {
+        Row: {
+          id: string;
+          conversation_id: string;
+          sender_id: string;
+          content: string;
+          timestamp: string;
+          message_type: string;
+          emotion_analysis: any | null;
+        };
+        Insert: {
+          id?: string;
+          conversation_id: string;
+          sender_id: string;
+          content: string;
+          timestamp?: string;
+          message_type?: string;
+          emotion_analysis?: any | null;
+        };
+        Update: {
+          id?: string;
+          conversation_id?: string;
+          sender_id?: string;
+          content?: string;
+          timestamp?: string;
+          message_type?: string;
+          emotion_analysis?: any | null;
+        };
+      };
+      conversations: {
+        Row: {
+          id: string;
+          participant_ids: string[];
+          type: string;
+          started_at: string;
+          ended_at: string | null;
+          status: string;
+        };
+        Insert: {
+          id?: string;
+          participant_ids: string[];
+          type: string;
+          started_at?: string;
+          ended_at?: string | null;
+          status?: string;
+        };
+        Update: {
+          id?: string;
+          participant_ids?: string[];
+          type?: string;
+          started_at?: string;
+          ended_at?: string | null;
+          status?: string;
+        };
+      };
     };
     Views: {
       [_ in never]: never;

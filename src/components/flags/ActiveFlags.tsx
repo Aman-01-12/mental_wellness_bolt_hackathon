@@ -34,8 +34,8 @@ interface Ticket {
 
 export function ActiveFlags() {
   const { user, profile, initialized } = useAuthStore();
-  const [tickets, setTickets] = useState<Ticket[]>([]);
-  const [allTickets, setAllTickets] = useState<Ticket[]>([]);
+  const [tickets, setTickets] = useState<Ticket[]>([]); // Raw tickets from fetch
+  const [filteredTickets, setFilteredTickets] = useState<Ticket[]>([]); // Tickets after filtering
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState({
@@ -47,43 +47,22 @@ export function ActiveFlags() {
 
   useEffect(() => {
     // Only fetch tickets if auth is initialized and user is authenticated
-    if (initialized && user?.id) {
+    if (!initialized || !user?.id) return;
+    const timeout = setTimeout(() => {
       fetchTickets();
-    } else if (initialized && !user) {
-      setLoading(false);
-      setError('Please sign in to view support requests');
-    }
+    }, 200); // debounce for stability
+    return () => clearTimeout(timeout);
   }, [user?.id, initialized]);
 
-  useEffect(() => {
-    applyFilters();
-  }, [filters, allTickets]);
-
-  // Helper: Wait for session to be ready, retry up to 5 times
-  const getSessionWithRetry = async (retries = 5, delay = 400): Promise<any> => {
-    for (let i = 0; i < retries; i++) {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.access_token) return session;
-      await new Promise(res => setTimeout(res, delay));
-    }
-    return null;
-  };
-
   const fetchTickets = async () => {
-    if (!user?.id) {
-      setError('Please sign in to view support requests');
-      setLoading(false);
-      return;
-    }
-
+    if (!initialized || !user?.id) return;
     setLoading(true);
     setError(null);
-    
     try {
       console.log('🎫 Starting ticket fetch process...');
       
-      // Wait for session to be ready, retry if needed
-      const session = await getSessionWithRetry();
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) {
         throw new Error('No authentication session found. Please sign in again.');
       }
@@ -146,7 +125,7 @@ export function ActiveFlags() {
 
       // Store all tickets for filtering
       const rawTickets = result.tickets || [];
-      setAllTickets(rawTickets);
+      setTickets(rawTickets);
       
       console.log('🎉 All tickets stored:', rawTickets.length);
       
@@ -158,62 +137,50 @@ export function ActiveFlags() {
     }
   };
 
-  const applyFilters = () => {
-    console.log('🔍 Applying filters to', allTickets.length, 'tickets');
-    
-    let filteredTickets = [...allTickets];
-
+  // Filter tickets after fetch and when filters/user.id change
+  useEffect(() => {
+    if (!tickets.length || !user?.id) {
+      setFilteredTickets([]);
+      return;
+    }
+    let filtered = [...tickets];
     // Filter out user's own tickets
-    const beforeOwnFilter = filteredTickets.length;
-    filteredTickets = filteredTickets.filter((ticket: Ticket) => {
-      const isOwnTicket = ticket.user_id === user?.id;
-      return !isOwnTicket;
-    });
-    console.log(`🚫 After filtering out own tickets: ${beforeOwnFilter} -> ${filteredTickets.length}`);
-
-    // Apply emotional state filter
+    filtered = filtered.filter((ticket: Ticket) => ticket.user_id !== user.id);
     if (filters.emotional_state) {
-      const beforeEmotionFilter = filteredTickets.length;
-      filteredTickets = filteredTickets.filter((ticket: Ticket) => 
-        ticket.emotional_state === filters.emotional_state
-      );
-      console.log(`😊 After emotion filter: ${beforeEmotionFilter} -> ${filteredTickets.length}`);
+      filtered = filtered.filter((ticket: Ticket) => ticket.emotional_state === filters.emotional_state);
     }
-
-    // Apply need tag filter
     if (filters.need_tag) {
-      const beforeNeedFilter = filteredTickets.length;
-      filteredTickets = filteredTickets.filter((ticket: Ticket) => 
-        ticket.need_tags?.includes(filters.need_tag)
-      );
-      console.log(`🏷️ After need filter: ${beforeNeedFilter} -> ${filteredTickets.length}`);
+      filtered = filtered.filter((ticket: Ticket) => ticket.need_tags?.includes(filters.need_tag));
     }
-
-    // Apply age range filter
     if (filters.age_range) {
-      const beforeAgeFilter = filteredTickets.length;
-      filteredTickets = filteredTickets.filter((ticket: Ticket) => 
-        ticket.age_range === filters.age_range
-      );
-      console.log(`👥 After age filter: ${beforeAgeFilter} -> ${filteredTickets.length}`);
+      filtered = filtered.filter((ticket: Ticket) => ticket.age_range === filters.age_range);
     }
-
-    // Apply search filter
     if (filters.search) {
-      const beforeSearchFilter = filteredTickets.length;
       const searchLower = filters.search.toLowerCase();
-      filteredTickets = filteredTickets.filter((ticket: Ticket) => 
+      filtered = filtered.filter((ticket: Ticket) =>
         ticket.display_name?.toLowerCase().includes(searchLower) ||
         ticket.emotional_state?.toLowerCase().includes(searchLower) ||
         ticket.need_tags?.some(tag => tag.toLowerCase().includes(searchLower)) ||
         (typeof ticket.details === 'string' && ticket.details.toLowerCase().includes(searchLower))
       );
-      console.log(`🔍 After search filter: ${beforeSearchFilter} -> ${filteredTickets.length}`);
     }
+    setFilteredTickets(filtered);
+  }, [tickets, filters, user?.id]);
 
-    console.log('🎉 Final filtered tickets:', filteredTickets.length);
-    setTickets(filteredTickets);
-  };
+  // Restore filters from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem('filters-active-flags');
+    if (saved) {
+      try {
+        setFilters(JSON.parse(saved));
+      } catch {}
+    }
+  }, []);
+
+  // Save filters to localStorage on change
+  useEffect(() => {
+    localStorage.setItem('filters-active-flags', JSON.stringify(filters));
+  }, [filters]);
 
   const clearFilters = () => {
     setFilters({
@@ -222,6 +189,7 @@ export function ActiveFlags() {
       age_range: '',
       search: ''
     });
+    localStorage.removeItem('filters-active-flags');
   };
 
   const getTimeAgo = (dateString: string) => {
@@ -433,11 +401,11 @@ export function ActiveFlags() {
                   Try Again
                 </button>
               </div>
-            ) : allTickets.length === 0 ? (
+            ) : filteredTickets.length === 0 ? (
               <div className="text-center py-12 text-gray-500">
                 <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-lg font-semibold">No support requests in the database</p>
-                <p className="text-sm mb-4">Be the first to create a support request</p>
+                <p className="text-lg font-semibold">No support requests found</p>
+                <p className="text-sm mb-4">Try adjusting your filters or check back later.</p>
                 <Link
                   to="/peer-matching"
                   className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
@@ -445,46 +413,16 @@ export function ActiveFlags() {
                   Create Support Request
                 </Link>
               </div>
-            ) : tickets.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                {hasActiveFilters ? (
-                  <>
-                    <p className="text-lg font-semibold">No support requests match your filters</p>
-                    <p className="text-sm mb-4">Try adjusting your search criteria</p>
-                    <button
-                      onClick={clearFilters}
-                      className="text-primary-600 hover:text-primary-700 font-medium"
-                    >
-                      Clear all filters
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-lg font-semibold">No support requests available for you</p>
-                    <p className="text-sm mb-4">All current requests are your own or check back soon</p>
-                    <Link
-                      to="/peer-matching"
-                      className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
-                    >
-                      Create Support Request
-                    </Link>
-                  </>
-                )}
-              </div>
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-sm text-gray-600">
-                    {tickets.length} support request{tickets.length !== 1 ? 's' : ''} found
-                    {allTickets.length > tickets.length && (
-                      <span className="text-gray-400"> (filtered from {allTickets.length} total)</span>
-                    )}
+                    {filteredTickets.length} support request{filteredTickets.length !== 1 ? 's' : ''} found
                   </p>
                 </div>
 
                 <div className="grid gap-4">
-                  {tickets.map(ticket => (
+                  {filteredTickets.map(ticket => (
                     <motion.div
                       key={ticket.id}
                       initial={{ opacity: 0, y: 20 }}
