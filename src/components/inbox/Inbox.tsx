@@ -28,6 +28,7 @@ export function Inbox() {
   const setConversations = useInboxStore((s) => s.setConversations);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [peerNames, setPeerNames] = useState<{ [conversationId: string]: string }>({});
   const isMounted = useRef(false);
 
   // Fetch initial conversations on mount
@@ -89,10 +90,39 @@ export function Inbox() {
     };
   }, [user, initialized, setConversations]);
 
+  // Fetch peer names for all conversations
+  useEffect(() => {
+    if (!user || !conversations.length) return;
+    let cancelled = false;
+    const fetchPeerNames = async () => {
+      const newPeerNames: { [conversationId: string]: string } = {};
+      await Promise.all(
+        conversations.map(async (conversation) => {
+          if (conversation.type === 'ai') return;
+          const peerId = conversation.participant_ids.find((id) => id !== user.id);
+          if (!peerId) return;
+          const { data, error } = await supabase
+            .from('users')
+            .select('display_name')
+            .eq('id', peerId)
+            .single();
+          if (!cancelled) {
+            newPeerNames[conversation.id] = data?.display_name || 'Peer';
+          }
+        })
+      );
+      if (!cancelled) setPeerNames(newPeerNames);
+    };
+    fetchPeerNames();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, conversations]);
+
   // Show loading if auth is not initialized yet
   if (!initialized) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+      <div className="min-h-screen bg-primary-50 dark:bg-gray-900">
         <Navigation />
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
@@ -107,7 +137,7 @@ export function Inbox() {
   // Show sign-in prompt if user is not authenticated
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+      <div className="min-h-screen bg-primary-50 dark:bg-gray-900">
         <Navigation />
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
@@ -129,7 +159,7 @@ export function Inbox() {
   // Show error if realtime subscription fails
   if (error?.toLowerCase().includes('real-time') || error?.toLowerCase().includes('timed out') || error?.toLowerCase().includes('closed')) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+      <div className="min-h-screen bg-primary-50 dark:bg-gray-900">
         <Navigation />
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
@@ -149,14 +179,14 @@ export function Inbox() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+    <div className="min-h-screen bg-primary-50 dark:bg-gray-900">
       <Navigation />
       
       <div className="max-w-4xl mx-auto px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl shadow-sm p-8"
+          className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm p-8"
         >
           <div className="flex items-center space-x-4 mb-6">
             <Link
@@ -170,28 +200,28 @@ export function Inbox() {
                 <MessageCircle className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Inbox</h1>
-                <p className="text-sm text-gray-500">Your conversations and messages</p>
+                <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Inbox</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-300">Your conversations and messages</p>
               </div>
             </div>
           </div>
 
           {error && (
-            <div className="bg-error-50 border border-error-200 rounded-xl p-4 mb-6">
-              <p className="text-error-700 text-sm">{error}</p>
+            <div className="bg-error-50 border border-error-200 dark:bg-error-900 dark:border-error-800 rounded-xl p-4 mb-6">
+              <p className="text-error-700 dark:text-error-200 text-sm">{error}</p>
             </div>
           )}
 
           {loading ? (
             <div className="flex justify-center py-12">
               <LoadingSpinner size="large" />
-              <p className="text-gray-500 ml-4">Loading conversations...</p>
+              <p className="text-gray-500 dark:text-gray-400 ml-4">Loading conversations...</p>
             </div>
           ) : conversations.length === 0 ? (
             <div className="text-center py-12">
-              <Users className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">No conversations yet</h3>
-              <p className="text-gray-600 mb-6">
+              <Users className="w-16 h-16 text-gray-300 dark:text-gray-600 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No conversations yet</h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
                 Start a conversation by connecting with peers or chatting with the AI companion.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
@@ -202,44 +232,44 @@ export function Inbox() {
                   Chat with AI
                 </Link>
                 <Link
-                  to="/active-flags"
+                  to="/peer-matching?tab=my-tickets"
                   className="px-6 py-3 bg-white text-primary-600 rounded-xl font-medium border border-primary-200 hover:border-primary-300 hover:shadow-lg transition-all"
                 >
-                  Find Peer Support
+                  My Requests
                 </Link>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
-              {conversations.map((conversation) => (
+              {conversations.filter(c => c.type !== 'ai').map((conversation) => (
                 <motion.div
                   key={conversation.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="border border-gray-200 rounded-2xl p-4 hover:border-primary-300 hover:shadow-sm transition-all cursor-pointer"
+                  className="border border-gray-200 dark:border-gray-700 rounded-2xl p-4 hover:border-primary-300 hover:shadow-sm transition-all cursor-pointer dark:bg-gray-900"
                 >
                   <Link to={`/chat/${conversation.id}`} className="block">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-secondary-100 to-primary-100 rounded-xl flex items-center justify-center">
-                          <Users className="w-6 h-6 text-secondary-600" />
+                        <div className="w-12 h-12 bg-gradient-to-br from-secondary-100 to-primary-100 dark:from-secondary-900 dark:to-primary-900 rounded-xl flex items-center justify-center">
+                          <Users className="w-6 h-6 text-secondary-600 dark:text-secondary-300" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900">
-                            {conversation.type === 'ai' ? 'AI Companion' : 'Peer Support'}
+                          <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                            {conversation.type === 'ai' ? 'AI Companion' : (peerNames[conversation.id] || 'Peer')}
                           </h3>
                           {conversation.latest_message ? (
-                            <p className="text-sm text-gray-600 truncate max-w-xs">
+                            <p className="text-sm text-gray-600 dark:text-gray-300 truncate max-w-xs">
                               {conversation.latest_message.content}
                             </p>
                           ) : (
-                            <p className="text-sm text-gray-500">No messages yet</p>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">No messages yet</p>
                           )}
                         </div>
                       </div>
                       <div className="text-right">
                         {conversation.latest_message && (
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
                             {new Date(conversation.latest_message.timestamp).toLocaleDateString()}
                           </p>
                         )}

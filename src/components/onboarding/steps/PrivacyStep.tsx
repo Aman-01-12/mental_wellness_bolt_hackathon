@@ -43,51 +43,6 @@ export function PrivacyStep({ onNext, data }: PrivacyStepProps) {
     onNext(formData);
   };
 
-  const privacyOptions = [
-    {
-      key: 'share_age_range',
-      label: 'Age Range',
-      description: 'Show your age range when matching with others',
-      icon: Users,
-      recommended: true
-    },
-    {
-      key: 'share_gender',
-      label: 'Gender',
-      description: 'Share your gender with matched peers',
-      icon: Users,
-      recommended: false
-    },
-    {
-      key: 'share_personality_traits',
-      label: 'Personality Traits',  
-      description: 'Show selected personality traits for better matching',
-      icon: Users,
-      recommended: true
-    },
-    {
-      key: 'share_work_status',
-      label: 'Work/Study Status',
-      description: 'Share your work or study situation',
-      icon: Users,
-      recommended: false
-    },
-    {
-      key: 'share_relationship_status',
-      label: 'Relationship Status',
-      description: 'Show your relationship status to matched peers',
-      icon: Users,
-      recommended: false
-    },
-    {
-      key: 'share_mental_health_background',
-      label: 'Mental Health Experience',
-      description: 'Share your mental health background for better support matching',
-      icon: Users,
-      recommended: false
-    }
-  ];
-
   return (
     <div>
       <motion.div
@@ -113,7 +68,6 @@ export function PrivacyStep({ onNext, data }: PrivacyStepProps) {
             <Lock className="w-5 h-5 text-primary-600" />
             <h3 className="font-semibold text-gray-900">Core Privacy Settings</h3>
           </div>
-          
           <div className="space-y-4">
             <label className="flex items-center justify-between cursor-pointer">
               <div>
@@ -126,7 +80,6 @@ export function PrivacyStep({ onNext, data }: PrivacyStepProps) {
                 className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
               />
             </label>
-
             <label className="flex items-center justify-between cursor-pointer">
               <div>
                 <span className="text-sm font-medium text-gray-900">Allow Peer Matching</span>
@@ -140,57 +93,6 @@ export function PrivacyStep({ onNext, data }: PrivacyStepProps) {
             </label>
           </div>
         </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <h3 className="font-semibold text-gray-900 mb-4">Information Sharing Preferences</h3>
-          <p className="text-sm text-gray-600 mb-6">
-            Choose what information to share when you're matched with peers. This helps others understand you better and provide more relevant support.
-          </p>
-
-          <div className="space-y-4">
-            {privacyOptions.map((option, index) => {
-              const Icon = option.icon;
-              const isChecked = watchedSettings?.[option.key as keyof typeof watchedSettings] || false;
-              
-              return (
-                <motion.label
-                  key={option.key}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 + index * 0.05 }}
-                  className="flex items-start space-x-4 p-4 border border-gray-200 rounded-xl hover:border-primary-300 cursor-pointer transition-all"
-                >
-                  <div className="flex-shrink-0 mt-1">
-                    <Icon className={`w-5 h-5 ${isChecked ? 'text-primary-600' : 'text-gray-400'}`} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-sm font-medium text-gray-900">{option.label}</span>
-                      {option.recommended && (
-                        <span className="px-2 py-1 bg-success-100 text-success-700 text-xs rounded-full">
-                          Recommended
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-gray-600 mt-1">{option.description}</p>
-                  </div>
-                  <div className="flex-shrink-0">
-                    <input
-                      {...register(`privacy_settings.${option.key}` as any)}
-                      type="checkbox"
-                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                    />
-                  </div>
-                </motion.label>
-              );
-            })}
-          </div>
-        </motion.div>
-
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -206,7 +108,6 @@ export function PrivacyStep({ onNext, data }: PrivacyStepProps) {
             <li>• You control when and how you engage</li>
           </ul>
         </motion.div>
-
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}

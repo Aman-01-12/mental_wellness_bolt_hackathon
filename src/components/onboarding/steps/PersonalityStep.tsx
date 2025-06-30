@@ -10,20 +10,22 @@ interface PersonalityStepProps {
 
 interface FormData {
   personality_traits: string[];
-  communication_style: string;
-  support_type: string;
+  communication_style: string[];
+  support_type: string[];
 }
 
 export function PersonalityStep({ onNext, data }: PersonalityStepProps) {
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     defaultValues: {
       personality_traits: data.personality_traits || [],
-      communication_style: data.communication_style || '',
-      support_type: data.support_type || ''
+      communication_style: data.communication_style || [],
+      support_type: data.support_type || []
     }
   });
 
   const watchedTraits = watch('personality_traits') || [];
+  const watchedCommunication = watch('communication_style') || [];
+  const watchedSupport = watch('support_type') || [];
 
   const onSubmit = (formData: FormData) => {
     onNext(formData);
@@ -35,6 +37,22 @@ export function PersonalityStep({ onNext, data }: PersonalityStepProps) {
       ? currentTraits.filter(t => t !== trait)
       : [...currentTraits, trait];
     setValue('personality_traits', newTraits);
+  };
+
+  const handleCommunicationToggle = (style: string) => {
+    const currentStyles = watchedCommunication;
+    const newStyles = currentStyles.includes(style)
+      ? currentStyles.filter(s => s !== style)
+      : [...currentStyles, style];
+    setValue('communication_style', newStyles);
+  };
+
+  const handleSupportToggle = (type: string) => {
+    const currentTypes = watchedSupport;
+    const newTypes = currentTypes.includes(type)
+      ? currentTypes.filter(t => t !== type)
+      : [...currentTypes, type];
+    setValue('support_type', newTypes);
   };
 
   const personalityTraits = [
@@ -79,13 +97,13 @@ export function PersonalityStep({ onNext, data }: PersonalityStepProps) {
                 key={trait}
                 type="button"
                 onClick={() => handleTraitToggle(trait)}
-                className={`p-3 border rounded-xl text-center transition-all ${
-                  watchedTraits.includes(trait)
-                    ? 'border-secondary-500 bg-secondary-50 text-secondary-700'
-                    : 'border-gray-200 hover:border-secondary-300'
-                }`}
+                className={`p-3 border rounded-xl text-center transition-all font-medium text-sm
+                  ${watchedTraits.includes(trait)
+                    ? 'bg-green-500 text-white border-green-500'
+                    : 'bg-white text-gray-900 border-gray-200 hover:border-green-400'}
+                `}
               >
-                <span className="text-sm font-medium">{trait}</span>
+                {trait}
               </button>
             ))}
           </div>
@@ -97,21 +115,22 @@ export function PersonalityStep({ onNext, data }: PersonalityStepProps) {
           transition={{ delay: 0.2 }}
         >
           <label className="block text-sm font-medium text-gray-700 mb-4">
-            Communication Style
+            Communication Style (Select all that apply)
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {communicationStyles.map((style) => (
-              <label key={style} className="cursor-pointer">
-                <input
-                  {...register('communication_style')}
-                  type="radio"
-                  value={style}
-                  className="sr-only peer"
-                />
-                <div className="p-3 border border-gray-200 rounded-xl text-center hover:border-secondary-300 peer-checked:border-secondary-500 peer-checked:bg-secondary-50 transition-all">
-                  <span className="text-sm font-medium">{style}</span>
-                </div>
-              </label>
+              <button
+                key={style}
+                type="button"
+                onClick={() => handleCommunicationToggle(style)}
+                className={`p-3 border rounded-xl text-center transition-all font-medium text-sm
+                  ${watchedCommunication.includes(style)
+                    ? 'bg-green-500 text-white border-green-500'
+                    : 'bg-white text-gray-900 border-gray-200 hover:border-green-400'}
+                `}
+              >
+                {style}
+              </button>
             ))}
           </div>
         </motion.div>
@@ -122,21 +141,22 @@ export function PersonalityStep({ onNext, data }: PersonalityStepProps) {
           transition={{ delay: 0.3 }}
         >
           <label className="block text-sm font-medium text-gray-700 mb-4">
-            Support Type You Prefer to Give <span className="text-error-500">*</span>
+            Support Type You Prefer to Give
           </label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {supportTypes.map((type) => (
-              <label key={type} className="cursor-pointer">
-                <input
-                  {...register('support_type', { required: 'Please select a support type' })}
-                  type="radio"
-                  value={type}
-                  className="sr-only peer"
-                />
-                <div className="p-3 border border-gray-200 rounded-xl text-center hover:border-secondary-300 peer-checked:border-secondary-500 peer-checked:bg-secondary-50 transition-all">
-                  <span className="text-sm font-medium">{type}</span>
-                </div>
-              </label>
+              <button
+                key={type}
+                type="button"
+                onClick={() => handleSupportToggle(type)}
+                className={`p-3 border rounded-xl text-center transition-all font-medium text-sm
+                  ${watchedSupport.includes(type)
+                    ? 'bg-green-500 text-white border-green-500'
+                    : 'bg-white text-gray-900 border-gray-200 hover:border-green-400'}
+                `}
+              >
+                {type}
+              </button>
             ))}
           </div>
           {errors.support_type && (

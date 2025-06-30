@@ -1,21 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Heart, Home, Bot, Flag, Users, User, LogOut, Menu, X, MessageCircle } from 'lucide-react';
+import { Home, Bot, Flag, Users, User, LogOut, MessageCircle, ClipboardList, Menu, X, Moon, Sun } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 export function Navigation() {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const { profile, signOut } = useAuthStore();
+  // Sync darkMode state with document class
+  const getIsDark = () => typeof window !== 'undefined' && document.documentElement.classList.contains('dark');
+  const [darkMode, setDarkMode] = useState(getIsDark());
+
+  useEffect(() => {
+    setDarkMode(getIsDark());
+  }, [location.pathname]);
+
+  const handleToggleDarkMode = () => {
+    document.documentElement.classList.toggle('dark');
+    setDarkMode(getIsDark());
+  };
 
   const navItems = [
     { path: '/', label: 'Home', icon: Home },
     { path: '/chat', label: 'AI Chat', icon: Bot },
-    { path: '/inbox', label: 'Inbox', icon: MessageCircle },
     { path: '/active-flags', label: 'Active Flags', icon: Flag },
     { path: '/peer-matching', label: 'Get Support', icon: Users },
-    { path: '/profile', label: 'Profile', icon: User },
+    { path: '/inbox', label: 'Inbox', icon: MessageCircle },
+    { path: '/peer-matching?tab=my-tickets', label: 'My Requests', icon: ClipboardList },
   ];
 
   const handleSignOut = async () => {
@@ -28,115 +39,97 @@ export function Navigation() {
 
   return (
     <>
-      <nav className="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <Link to="/" className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
-                <Heart className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-gray-900">MindSpace</span>
-            </Link>
+      {/* Mobile sidebar toggle */}
+      <button
+        className="fixed top-4 left-4 z-50 md:hidden bg-white border border-gray-200 rounded-xl p-2 shadow-md"
+        onClick={() => setSidebarOpen((open) => !open)}
+        aria-label="Open sidebar"
+      >
+        {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+      </button>
 
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-1">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const isActive = location.pathname === item.path;
-                
-                return (
-                  <Link
-                    key={item.path}
-                    to={item.path}
-                    className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${
-                      isActive
-                        ? 'bg-primary-100 text-primary-700'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                    }`}
-                  >
-                    <Icon className="w-4 h-4" />
-                    <span className="font-medium">{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-
-            {/* User Menu */}
-            <div className="hidden md:flex items-center space-x-4">
-              <div className="text-sm text-gray-600">
-                {profile?.display_name || 'Anonymous'}
-              </div>
-              <button
-                onClick={handleSignOut}
-                className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="font-medium">Sign Out</span>
-              </button>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="md:hidden p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all"
-            >
-              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-            </button>
+      {/* Sidebar */}
+      <aside
+        className={`fixed top-0 left-0 h-full w-64 bg-white border-r border-gray-200 flex flex-col z-40 transition-transform duration-200 md:translate-x-0 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        }`}
+      >
+        {/* Logo and app name */}
+        <div className="flex items-center gap-2 px-6 py-6 border-b border-gray-100">
+          <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
+            <Bot className="w-5 h-5 text-white" />
           </div>
+          <span className="text-2xl font-bold text-primary-700 tracking-tight">MindSpace</span>
         </div>
 
-        {/* Mobile Menu */}
-        <AnimatePresence>
-          {isMobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="md:hidden border-t border-gray-200 bg-white"
-            >
-              <div className="px-4 py-4 space-y-2">
-                {navItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = location.pathname === item.path;
-                  
-                  return (
-                    <Link
-                      key={item.path}
-                      to={item.path}
-                      onClick={() => setIsMobileMenuOpen(false)}
-                      className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition-all ${
-                        isActive
-                          ? 'bg-primary-100 text-primary-700'
-                          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                      }`}
-                    >
-                      <Icon className="w-5 h-5" />
-                      <span className="font-medium">{item.label}</span>
-                    </Link>
-                  );
-                })}
-                
-                <div className="border-t border-gray-200 pt-4 mt-4">
-                  <div className="px-4 py-2 text-sm text-gray-600">
-                    {profile?.display_name || 'Anonymous'}
-                  </div>
-                  <button
-                    onClick={() => {
-                      handleSignOut();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="flex items-center space-x-3 px-4 py-3 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-all w-full"
-                  >
-                    <LogOut className="w-5 h-5" />
-                    <span className="font-medium">Sign Out</span>
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </nav>
+        {/* Navigation links */}
+        <nav className="flex-1 flex flex-col gap-1 px-2 py-4">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = location.pathname === item.path;
+            return (
+              <Link
+                key={item.path}
+                to={item.path}
+                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-base ${
+                  isActive
+                    ? 'bg-primary-50 text-primary-700 shadow-sm'
+                    : 'text-gray-700 hover:bg-gray-100 hover:text-primary-700'
+                }`}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <Icon className="w-5 h-5" />
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Divider */}
+        <div className="border-t border-gray-100 my-2 mx-4" />
+
+        {/* Profile and Sign Out at the bottom */}
+        <div className="flex flex-col gap-1 px-2 pb-6 mt-auto">
+          <Link
+            to="/profile"
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-base ${
+              location.pathname === '/profile'
+                ? 'bg-primary-50 text-primary-700 shadow-sm'
+                : 'text-gray-700 hover:bg-gray-100 hover:text-primary-700'
+            }`}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <User className="w-5 h-5" />
+            Profile
+          </Link>
+          {/* Appearance toggle button */}
+          <button
+            onClick={handleToggleDarkMode}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-base text-gray-700 hover:bg-gray-100 hover:text-primary-700"
+          >
+            {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            Appearance
+          </button>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-base text-gray-700 hover:bg-gray-100 hover:text-primary-700"
+          >
+            <LogOut className="w-5 h-5" />
+            Sign Out
+          </button>
+        </div>
+      </aside>
+
+      {/* Overlay for mobile */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/20 z-30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close sidebar overlay"
+        />
+      )}
+      {/* Add left margin to main content on desktop */}
+      <div className="md:ml-64" />
     </>
   );
 }

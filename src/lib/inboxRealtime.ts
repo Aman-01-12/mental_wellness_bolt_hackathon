@@ -1,11 +1,12 @@
 import { supabase } from './supabase';
 import { useInboxStore } from '../store/inboxStore';
 import { refetchInboxConversations } from './inboxFetch';
+import type { Message } from '../store/inboxStore';
 
 let channel: any = null;
 let userIdForRefetch: string | null = null;
 
-export function startInboxRealtime(userId: string) {
+export function startInboxRealtime(userId: string, onNewMessage?: (msg: Message) => void) {
   if (channel) stopInboxRealtime();
   userIdForRefetch = userId;
   channel = supabase
@@ -18,7 +19,8 @@ export function startInboxRealtime(userId: string) {
         table: 'messages',
       },
       (payload) => {
-        useInboxStore.getState().addOrUpdateMessage(payload.new);
+        useInboxStore.getState().addOrUpdateMessage(payload.new as Message);
+        if (onNewMessage) onNewMessage(payload.new as Message);
       }
     )
     .subscribe(async (status) => {

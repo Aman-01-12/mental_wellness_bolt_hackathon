@@ -25,6 +25,8 @@ export function PeerChatInterface() {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const draftKey = conversationId ? `chatDraft-${conversationId}` : undefined;
+  const [peerName, setPeerName] = useState<string>('Peer');
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // Fetch conversation and messages
   useEffect(() => {
@@ -33,6 +35,16 @@ export function PeerChatInterface() {
       setLoading(true);
       setError(null);
       try {
+        // Fetch all conversations for the user and log their IDs
+        const { data: allConvs, error: allConvsErr } = await supabase
+          .from('conversations')
+          .select('id, participant_ids')
+          .contains('participant_ids', [user.id]);
+        if (allConvsErr) {
+          console.error('Error fetching all conversations:', allConvsErr);
+        } else {
+          console.log('All conversation IDs for user', user.id, ':', allConvs?.map((c: any) => c.id));
+        }
         // Fetch conversation
         const { data: conv, error: convErr } = await supabase
           .from('conversations')
@@ -135,6 +147,8 @@ export function PeerChatInterface() {
       if (draftKey) {
         localStorage.removeItem(draftKey);
       }
+      // Focus the textarea after sending
+      inputRef.current?.focus();
     } catch (err: any) {
       setError(err.message || 'Failed to send message');
     } finally {
@@ -142,9 +156,38 @@ export function PeerChatInterface() {
     }
   };
 
+  // Fetch peer name after conversation is loaded
+  useEffect(() => {
+    if (!conversation || !user) return;
+    let peerId = null;
+    if (Array.isArray(conversation.participant_ids)) {
+      peerId = conversation.participant_ids.find((id: string) => id !== user.id);
+    }
+    if (!peerId) return;
+    // Fetch peer user record from users table
+    supabase
+      .from('users')
+      .select('display_name')
+      .eq('id', peerId)
+      .single()
+      .then(({ data, error }) => {
+        if (data && data.display_name) {
+          setPeerName(data.display_name);
+        } else {
+          setPeerName('Peer');
+        }
+      });
+  }, [conversation, user]);
+
+  useEffect(() => {
+    if (!sending) {
+      inputRef.current?.focus();
+    }
+  }, [sending]);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 flex items-center justify-center">
+      <div className="min-h-screen bg-primary-50 dark:bg-gray-900 flex items-center justify-center">
         <LoadingSpinner size="large" />
       </div>
     );
@@ -152,11 +195,11 @@ export function PeerChatInterface() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 flex items-center justify-center">
-        <div className="bg-white rounded-3xl shadow-sm p-8 text-center">
+      <div className="min-h-screen bg-primary-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm p-8 text-center">
           <AlertCircle className="w-10 h-10 text-error-500 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Error</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">Error</h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">{error}</p>
           <Link to="/inbox" className="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all">Back to Inbox</Link>
         </div>
       </div>
@@ -164,75 +207,81 @@ export function PeerChatInterface() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 flex flex-col">
+    <div className="min-h-screen bg-primary-50 dark:bg-gray-900 flex flex-col">
       <Navigation />
-      <div className="flex-1 max-w-4xl mx-auto w-full px-4 py-6 flex flex-col">
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-2xl shadow-sm p-6 mb-6"
-        >
-          <div className="flex items-center space-x-4">
-            <Link to="/inbox" className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all">
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-secondary-500 to-primary-500 rounded-xl flex items-center justify-center">
-                <Users className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">Peer Chat</h1>
-                <p className="text-sm text-gray-500">Chat with your matched peer</p>
+      <div className="flex-1 flex flex-col items-center justify-center">
+        <div className="w-full max-w-4xl flex flex-col h-[calc(100vh-0px)] px-4 py-6">
+          <div className="flex flex-col flex-1 rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden shadow-sm">
+            {/* Header (static, always visible) */}
+            <div className="flex-shrink-0">
+              <motion.div
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white dark:bg-gray-900 rounded-t-2xl p-6"
+              >
+                <div className="flex items-center space-x-4">
+                  <Link to="/inbox" className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all">
+                    <ArrowLeft className="w-5 h-5" />
+                  </Link>
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-secondary-500 to-primary-500 rounded-xl flex items-center justify-center">
+                      <Users className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{peerName}</h1>
+                      <p className="text-sm text-gray-500 dark:text-gray-300">Chat with your matched peer</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+            {/* Messages area (scrollable, framed by header and input) */}
+            <div className="flex-1 overflow-y-auto px-0">
+              <div className="flex flex-col min-h-[300px] p-6 space-y-6">
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[80%] ${msg.sender_id === user?.id
+                      ? 'order-2 bg-gradient-to-r from-primary-500 to-secondary-500 text-white'
+                      : 'order-1 bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'} rounded-2xl px-4 py-3`}>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                    </div>
+                  </div>
+                ))}
+                <div ref={messagesEndRef} />
               </div>
             </div>
-          </div>
-        </motion.div>
-        {/* Messages Container */}
-        <div className="flex-1 bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col">
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.sender_id === user?.id ? 'justify-end' : 'justify-start'}`}
-              >
-                <div className={`max-w-[80%] ${msg.sender_id === user?.id ? 'order-2 bg-gradient-to-r from-primary-500 to-secondary-500 text-white' : 'order-1 bg-gray-100 text-gray-900'} rounded-2xl px-4 py-3`}>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                  <span className="text-xs text-gray-400 block mt-1">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-          {/* Input Form */}
-          <div className="border-t border-gray-100 p-6">
-            <form onSubmit={handleSend} className="flex space-x-4">
-              <div className="flex-1 relative">
+            {/* Input bar (static, always visible) */}
+            <div className="flex-shrink-0">
+              <form onSubmit={handleSend} className="flex items-center gap-3 border-t border-gray-100 dark:border-gray-700 px-4 py-3 bg-white dark:bg-gray-900 rounded-b-2xl">
                 <textarea
+                  ref={inputRef}
                   value={inputValue}
                   onChange={handleInputChange}
-                  placeholder="Type your message..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors resize-none"
                   rows={1}
-                  style={{ minHeight: '48px', maxHeight: '120px', height: 'auto' }}
-                  onInput={(e) => {
-                    const target = e.target as HTMLTextAreaElement;
-                    target.style.height = 'auto';
-                    target.style.height = `${Math.min(target.scrollHeight, 120)}px`;
+                  className="flex-1 resize-none border-none outline-none bg-transparent text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-0 text-sm"
+                  placeholder="Type your message..."
+                  disabled={sending}
+                  style={{ minHeight: 40 }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend(e);
+                    }
                   }}
                 />
-              </div>
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                type="submit"
-                disabled={!inputValue.trim() || sending}
-                className="px-6 py-3 bg-gradient-to-r from-primary-500 to-secondary-500 text-white rounded-2xl font-medium hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                {sending ? <LoadingSpinner size="small" color="white" /> : <Send className="w-4 h-4" />}
-                <span>Send</span>
-              </motion.button>
-            </form>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-primary-500 to-secondary-500 text-white font-semibold flex items-center gap-2 disabled:opacity-60"
+                  disabled={sending || !inputValue.trim()}
+                >
+                  <Send className="w-5 h-5" />
+                  Send
+                </button>
+              </form>
+            </div>
           </div>
         </div>
       </div>

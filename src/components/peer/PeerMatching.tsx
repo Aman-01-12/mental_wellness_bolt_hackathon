@@ -255,7 +255,7 @@ export function PeerMatching() {
   // Show loading if auth is not initialized yet
   if (!initialized) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+      <div className="min-h-screen bg-primary-50 dark:bg-gray-900">
         <Navigation />
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
@@ -268,19 +268,19 @@ export function PeerMatching() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+    <div className="min-h-screen bg-primary-50 dark:bg-gray-900">
       <Navigation />
       <div className="max-w-4xl mx-auto px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl shadow-sm overflow-hidden"
+          className="bg-white dark:bg-gray-900 rounded-3xl shadow-sm overflow-hidden"
         >
           {/* Header */}
-          <div className="flex items-center space-x-4 p-6 border-b border-gray-100">
+          <div className="flex items-center space-x-4 p-6 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900">
             <Link
               to="/"
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all"
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all"
             >
               <ArrowLeft className="w-5 h-5" />
             </Link>
@@ -289,8 +289,8 @@ export function PeerMatching() {
                 <Users className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Support Requests</h1>
-                <p className="text-sm text-gray-500">Create and manage your support requests</p>
+                <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Support Requests</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-300">Create and manage your support requests</p>
               </div>
             </div>
             <div className="flex-1 flex justify-end">
@@ -304,13 +304,13 @@ export function PeerMatching() {
           </div>
 
           {/* Tab Navigation */}
-          <div className="flex border-b border-gray-100">
+          <div className="flex border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900">
             <button
               onClick={() => setActiveTab('create')}
               className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
                 activeTab === 'create'
-                  ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-gray-900 border-b-2 border-gray-100 dark:bg-gray-800'
+                  : 'text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               }`}
             >
               <div className="flex items-center justify-center space-x-2">
@@ -322,8 +322,8 @@ export function PeerMatching() {
               onClick={() => setActiveTab('my-tickets')}
               className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
                 activeTab === 'my-tickets'
-                  ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700'
+                  ? 'text-gray-900 border-b-2 border-gray-100 dark:bg-gray-800'
+                  : 'text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100'
               }`}
             >
               <div className="flex items-center justify-center space-x-2">
@@ -339,17 +339,17 @@ export function PeerMatching() {
             {activeTab === 'create' && (
               <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 max-w-2xl mx-auto">
                 <div className="text-center mb-8">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">Request Support</h2>
-                  <p className="text-gray-600">Let others know how they can help you today</p>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Request Support</h2>
+                  <p className="text-gray-500 dark:text-gray-300">Let others know how they can help you today</p>
                 </div>
 
                 {/* Display Name */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Display Name (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Display Name (Optional)</label>
                   <input
                     {...register('display_name')}
                     type="text"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    className="w-full px-4 py-3 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-accent-500 focus:border-accent-500 transition-colors dark:text-gray-100 dark:bg-gray-800"
                     placeholder="How would you like to be called? (can be anonymous)"
                     autoComplete="off"
                   />
@@ -357,7 +357,7 @@ export function PeerMatching() {
 
                 {/* Age Range */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Age Range <span className="text-error-500">*</span></label>
+                  <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Age Range <span className="text-error-500">*</span></label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {AGE_RANGES.map((range) => (
                       <label key={range} className="cursor-pointer">
@@ -367,7 +367,7 @@ export function PeerMatching() {
                           value={range}
                           className="sr-only peer"
                         />
-                        <div className="p-3 border border-gray-200 rounded-xl text-center hover:border-primary-300 peer-checked:border-primary-500 peer-checked:bg-primary-50 transition-all">
+                        <div className="p-3 border border-gray-100 dark:border-gray-700 rounded-xl text-center hover:border-accent-500 peer-checked:border-accent-500 peer-checked:bg-accent-500 dark:bg-gray-800 dark:text-gray-100 transition-all">
                           <span className="text-sm font-medium">{range}</span>
                         </div>
                       </label>
@@ -380,10 +380,10 @@ export function PeerMatching() {
 
                 {/* Emotional State */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Emotional State <span className="text-error-500">*</span></label>
+                  <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Emotional State <span className="text-error-500">*</span></label>
                   <select
                     {...register('emotional_state', { required: 'Please select your current emotional state' })}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    className="w-full px-4 py-3 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-accent-500 focus:border-accent-500 transition-colors dark:text-gray-100 dark:bg-gray-800"
                     defaultValue=""
                   >
                     <option value="" disabled>Select your current emotional state</option>
@@ -398,17 +398,17 @@ export function PeerMatching() {
 
                 {/* Need Tags */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">What do you need right now? <span className="text-error-500">*</span></label>
+                  <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">What do you need right now? <span className="text-error-500">*</span></label>
                   <div className="flex flex-wrap gap-2">
                     {NEED_TAGS.map((tag) => (
                       <button
                         type="button"
                         key={tag}
                         onClick={() => handleTagToggle(tag)}
-                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-primary-500 ${
+                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all focus:outline-none focus:ring-2 focus:ring-accent-500 ${
                           selectedTags.includes(tag)
-                            ? 'bg-primary-500 text-white border-primary-500'
-                            : 'bg-white text-gray-700 border-gray-200 hover:bg-primary-50'
+                            ? 'bg-accent-500 text-white border-accent-500'
+                            : 'bg-white text-gray-900 border-gray-100 hover:bg-accent-500 dark:bg-gray-800 dark:text-gray-100 dark:border-gray-700'
                         }`}
                         aria-pressed={selectedTags.includes(tag)}
                       >
@@ -423,29 +423,29 @@ export function PeerMatching() {
 
                 {/* Details */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Anything else you'd like to share? (Optional)</label>
+                  <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">Anything else you'd like to share? (Optional)</label>
                   <textarea
                     {...register('details')}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                    className="w-full px-4 py-3 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-accent-500 focus:border-accent-500 transition-colors dark:text-gray-100 dark:bg-gray-800"
                     rows={3}
                     placeholder="Share any context, preferences, or boundaries (optional)"
                   />
                 </div>
 
                 {/* Privacy/Consent Notice */}
-                <div className="bg-primary-50 rounded-xl p-4 text-xs text-gray-600 mb-2">
+                <div className="bg-white dark:bg-gray-800 rounded-xl p-4 text-xs text-gray-500 dark:text-gray-300 mb-2">
                   By creating a support request, you agree to share the above information with potential peer supporters. You can withdraw your request at any time. Your privacy and consent are always respected.
                 </div>
 
                 {/* Error Message */}
                 {error && (
-                  <div className="bg-red-100 text-red-700 rounded-xl p-3 text-sm mb-2">{error}</div>
+                  <div className="bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 rounded-xl p-3 text-sm mb-2">{error}</div>
                 )}
 
                 {/* Submit Button */}
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-primary-500 to-secondary-500 text-white py-4 px-6 rounded-2xl font-medium hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-60"
+                  className="w-full bg-gradient-to-r from-accent-500 to-primary-500 text-white py-4 px-6 rounded-2xl font-medium hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-60"
                   disabled={loading || selectedTags.length === 0}
                 >
                   {loading ? (
@@ -464,25 +464,25 @@ export function PeerMatching() {
             {activeTab === 'my-tickets' && (
               <div className="space-y-6">
                 <div className="text-center mb-8">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">My Support Requests</h2>
-                  <p className="text-gray-600">Manage your active requests and incoming connections</p>
+                  <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">My Support Requests</h2>
+                  <p className="text-gray-500 dark:text-gray-300">Manage your active requests and incoming connections</p>
                 </div>
 
                 {myTicketsLoading ? (
                   <div className="flex justify-center py-12">
                     <LoadingSpinner size="large" />
-                    <p className="text-gray-500 ml-4">Loading your requests...</p>
+                    <p className="text-gray-500 dark:text-gray-300 ml-4">Loading your requests...</p>
                   </div>
                 ) : myTicketsError ? (
-                  <div className="bg-red-100 text-red-700 rounded-xl p-4 text-center">{myTicketsError}</div>
+                  <div className="bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200 rounded-xl p-4 text-center">{myTicketsError}</div>
                 ) : myTickets.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Heart className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <div className="text-center py-12 text-gray-500 dark:text-gray-300">
+                    <Heart className="w-12 h-12 mx-auto mb-4 text-gray-900 dark:text-gray-100" />
                     <p className="text-lg font-semibold">No active support requests</p>
                     <p className="text-sm mb-4">Create a request to connect with supportive peers</p>
                     <button
                       onClick={() => setActiveTab('create')}
-                      className="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
+                      className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
                     >
                       Create Support Request
                     </button>
@@ -490,22 +490,22 @@ export function PeerMatching() {
                 ) : (
                   <div className="grid gap-6">
                     {myTickets.map(ticket => (
-                      <div key={ticket.id} className="border border-gray-200 rounded-2xl p-6 bg-gradient-to-br from-primary-50 to-secondary-50">
+                      <div key={ticket.id} className="border border-gray-100 dark:border-gray-700 rounded-2xl p-6 bg-gradient-to-br from-white to-accent-500 dark:from-gray-800 dark:to-accent-600">
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-3">
-                              <span className="font-semibold text-primary-700 text-lg">
+                              <span className="font-semibold text-gray-900 dark:text-gray-100 text-lg">
                                 {ticket.display_name || 'Anonymous'}
                               </span>
                               {ticket.age_range && (
-                                <span className="text-xs bg-primary-100 text-primary-700 rounded-full px-3 py-1">
+                                <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full px-3 py-1">
                                   {ticket.age_range}
                                 </span>
                               )}
-                              <span className="text-xs bg-secondary-100 text-secondary-700 rounded-full px-3 py-1">
+                              <span className="text-xs bg-accent-500 text-white rounded-full px-3 py-1">
                                 {ticket.emotional_state}
                               </span>
-                              <div className="flex items-center text-xs text-gray-500">
+                              <div className="flex items-center text-xs text-gray-500 dark:text-gray-300">
                                 <Clock className="w-3 h-3 mr-1" />
                                 {getTimeAgo(ticket.created_at)}
                               </div>
@@ -513,14 +513,17 @@ export function PeerMatching() {
                             
                             <div className="flex flex-wrap gap-2 mb-3">
                               {ticket.need_tags && ticket.need_tags.map((tag: string) => (
-                                <span key={tag} className="text-xs bg-accent-100 text-accent-700 rounded-full px-3 py-1">
+                                <span key={tag} className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100 rounded-full px-3 py-1">
                                   {tag}
                                 </span>
                               ))}
                             </div>
                             
-                            {ticket.details && (
-                              <p className="text-sm text-gray-700 mb-4">{ticket.details}</p>
+                            {typeof ticket.details === 'string' && ticket.details && (
+                              <p className="text-sm text-gray-900 dark:text-gray-100 mb-4">{ticket.details}</p>
+                            )}
+                            {typeof ticket.details === 'object' && ticket.details !== null && (
+                              <p className="text-sm text-gray-900 dark:text-gray-100 mb-4">[Invalid details format]</p>
                             )}
                           </div>
                           
@@ -649,8 +652,8 @@ function IncomingRequests({ ticketId }: { ticketId: string }) {
   };
 
   return (
-    <div className="mt-6 pt-4 border-t border-gray-200">
-      <h4 className="text-sm font-semibold text-primary-600 mb-3">Incoming Connection Requests</h4>
+    <div className="mt-6 pt-4 border-t border-gray-100 dark:border-gray-700">
+      <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-3">Incoming Connection Requests</h4>
       {loading ? (
         <div className="flex items-center space-x-2 text-xs text-gray-500">
           <LoadingSpinner size="small" color="gray" />
@@ -663,10 +666,10 @@ function IncomingRequests({ ticketId }: { ticketId: string }) {
       ) : (
         <div className="space-y-3">
           {requests.map((req) => (
-            <div key={req.id} className="flex items-center justify-between bg-white border border-gray-100 rounded-xl px-4 py-3">
+            <div key={req.id} className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-xl px-4 py-3">
               <div className="flex-1">
                 <div className="flex items-center space-x-2">
-                  <span className="font-medium text-primary-700">
+                  <span className="font-medium text-gray-900 dark:text-gray-100">
                     {req.requester_display_name || 'Anonymous'}
                   </span>
                   <span className="text-xs text-gray-500">wants to connect</span>

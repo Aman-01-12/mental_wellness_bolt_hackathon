@@ -1,9 +1,26 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
+        // Light mode custom colors (green theme)
+        custom: {
+          bg: '#112218',
+          border: '#244733',
+          card: '#1a3325',
+          text: '#92c8aa',
+          button: '#13c25f'
+        },
+        // Dark mode colors based on #2113c3
+        dark: {
+          primary: '#2113c3',
+          lighter: '#4235d9',
+          darker: '#160c8f',
+          text: '#ffffff',
+          muted: '#b4b4ff'
+        },
         primary: {
           50: '#f0fdfa',
           100: '#ccfbf1',

@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 
-interface Message {
+export interface Message {
   id: string;
   conversation_id: string;
   sender_id: string;
   content: string;
   timestamp: string;
+  sender_role?: string | null;
 }
 
 interface Conversation {

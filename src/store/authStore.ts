@@ -21,6 +21,7 @@ interface UserProfile {
   onboarding_completed: boolean
   created_at: string
   updated_at: string
+  ai_companion_name?: string | null
 }
 
 interface AuthState {
@@ -163,7 +164,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   fetchProfile: async () => {
-    const { user } = get()
+    const { user, signOut } = get()
     if (!user) return
 
     try {
@@ -176,6 +177,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (error) {
         console.error('Error fetching profile:', error)
         return
+      }
+
+      if (!data) {
+        // User not found in users table (deleted from DB)
+        alert('Your account no longer exists. Please sign up again.');
+        await signOut();
+        window.location.href = '/auth';
+        return;
       }
 
       set({ 

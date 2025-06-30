@@ -52,17 +52,17 @@ export function BasicInfoStep({ onNext, data }: BasicInfoStepProps) {
           transition={{ delay: 0.1 }}
         >
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Display Name (Optional)
+            Display Name <span className="text-error-500">*</span>
           </label>
           <input
-            {...register('display_name')}
+            {...register('display_name', { required: 'Display name is required' })}
             type="text"
             className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
             placeholder="How would you like to be called? (can be anonymous)"
           />
-          <p className="mt-1 text-xs text-gray-500">
-            This can be your real name, nickname, or any anonymous name you prefer
-          </p>
+          {errors.display_name && (
+            <p className="mt-1 text-sm text-error-500">{errors.display_name.message}</p>
+          )}
         </motion.div>
 
         <motion.div

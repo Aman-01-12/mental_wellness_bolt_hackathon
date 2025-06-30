@@ -131,21 +131,18 @@ export function SignUpForm() {
       </div>
 
       <div className="flex items-start space-x-3">
-        <div className="relative">
+        <div className="relative flex items-center">
           <input
             {...register('agreeToTerms', {
               required: 'You must agree to the terms and privacy policy'
             })}
             type="checkbox"
-            className="sr-only"
             id="agreeToTerms"
+            className="peer w-5 h-5 border-2 border-gray-300 rounded cursor-pointer hover:border-primary-400 transition-colors"
           />
-          <label
-            htmlFor="agreeToTerms"
-            className="flex items-center justify-center w-5 h-5 border-2 border-gray-300 rounded cursor-pointer hover:border-primary-400 transition-colors"
-          >
+          <span className="absolute left-0 top-0 flex items-center justify-center w-5 h-5 pointer-events-none">
             <Check className="w-3 h-3 text-primary-500 opacity-0 peer-checked:opacity-100 transition-opacity" />
-          </label>
+          </span>
         </div>
         <label htmlFor="agreeToTerms" className="text-sm text-gray-600 cursor-pointer">
           I agree to the{' '}

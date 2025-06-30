@@ -1,3 +1,50 @@
+html, body {
+  background-color: #112218 !important;
+}
+.dark html, .dark body, .dark .card, .dark .bg-transparent {
+  background-color: #18125c !important;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-primary-50;
+  }
+  .dark body {
+    @apply bg-[#18125c];
+  }
+
+  /* Default button styles */
+  button {
+    @apply bg-custom-button text-custom-bg hover:opacity-90;
+  }
+  
+  .dark button {
+    @apply bg-dark-lighter text-dark-text hover:bg-dark-primary;
+  }
+
+  /* Default card styles */
+  .card {
+    @apply bg-white;
+  }
+  
+  .dark .card {
+    background-color: #18125c !important;
+  }
+
+  .dark .bg-transparent {
+    background-color: #18125c !important;
+  }
+
+  /* Default text styles */
+  .text-muted {
+    @apply text-custom-text opacity-80;
+  }
+  
+  .dark .text-muted {
+    @apply text-dark-muted;
+  }
+}

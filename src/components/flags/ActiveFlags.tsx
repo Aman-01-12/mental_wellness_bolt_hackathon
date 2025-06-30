@@ -211,12 +211,12 @@ export function ActiveFlags() {
   // Show loading if auth is not initialized yet
   if (!initialized) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+      <div className="min-h-screen bg-[#112218] dark:bg-[#18125c]">
         <Navigation />
         <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
+          <div className="rounded-3xl shadow-sm p-12 text-center bg-white dark:bg-gray-900">
             <LoadingSpinner size="large" />
-            <p className="mt-4 text-gray-600">Initializing...</p>
+            <p className="mt-4 text-gray-600 dark:text-gray-100">Initializing...</p>
           </div>
         </div>
       </div>
@@ -226,13 +226,13 @@ export function ActiveFlags() {
   // Show sign-in prompt if user is not authenticated or session is missing
   if (!user || error?.includes('sign in')) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+      <div className="min-h-screen bg-[#112218] dark:bg-[#18125c]">
         <Navigation />
         <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="bg-white rounded-3xl shadow-sm p-12 text-center">
-            <AlertCircle className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Sign In Required</h2>
-            <p className="text-gray-600 mb-6">You need to be signed in to view support requests.</p>
+          <div className="rounded-3xl shadow-sm p-12 text-center bg-white dark:bg-gray-900">
+            <AlertCircle className="w-16 h-16 mx-auto mb-4 text-gray-400 dark:text-gray-200" />
+            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">Sign In Required</h2>
+            <p className="text-gray-600 dark:text-gray-100 mb-6">You need to be signed in to view support requests.</p>
             <Link
               to="/auth"
               className="inline-block bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all"
@@ -246,39 +246,39 @@ export function ActiveFlags() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50">
+    <div className="min-h-screen bg-primary-50 dark:bg-gray-900">
       <Navigation />
       
       <div className="max-w-6xl mx-auto px-4 py-8">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl shadow-sm overflow-hidden"
+          className="rounded-3xl shadow-sm overflow-hidden bg-white dark:bg-gray-900"
         >
           {/* Header */}
-          <div className="flex items-center space-x-4 p-6 border-b border-gray-100">
-            <Link
-              to="/"
-              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all"
+          <div className="flex items-center space-x-4 p-6 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900">
+            <button
+              onClick={() => window.history.back()}
+              className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all"
             >
               <ArrowLeft className="w-5 h-5" />
-            </Link>
+            </button>
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-secondary-500 to-primary-500 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-xl flex items-center justify-center">
                 <Flag className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">Active Support Requests</h1>
-                <p className="text-sm text-gray-500">Find people who need support right now</p>
+                <h1 className="text-xl font-semibold text-gray-900 dark:text-white">Active Support Requests</h1>
+                <p className="text-sm text-gray-500 dark:text-gray-100">Find people who need support right now</p>
               </div>
             </div>
             <div className="flex-1 flex justify-end space-x-3">
               <button
                 onClick={fetchTickets}
-                className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-xl transition-all"
+                className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-all"
                 disabled={loading}
               >
-                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={loading ? 'animate-spin' : ''} />
                 <span>Refresh</span>
               </button>
               <Link
@@ -291,30 +291,30 @@ export function ActiveFlags() {
           </div>
 
           {/* Filters Section */}
-          <div className="p-6 border-b border-gray-100 bg-gray-50">
+          <div className="p-6 border-b border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900">
             <div className="flex items-center space-x-2 mb-4">
-              <Filter className="w-4 h-4 text-gray-600" />
-              <h3 className="font-medium text-gray-900">Filter Support Requests</h3>
+              <Filter className="w-4 h-4 text-gray-500 dark:text-gray-100" />
+              <h3 className="font-medium text-gray-900 dark:text-white">Filter Support Requests</h3>
               {hasActiveFilters && (
                 <button
                   onClick={clearFilters}
-                  className="text-xs text-primary-600 hover:text-primary-700 font-medium"
+                  className="text-xs text-gray-600 hover:text-gray-800 font-medium"
                 >
                   Clear All
                 </button>
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 dark:text-gray-100" />
                 <input
                   type="text"
-                  placeholder="Search requests..."
+                  placeholder="Search by keywords..."
                   value={filters.search}
                   onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors dark:text-white dark:bg-transparent"
                 />
               </div>
 
@@ -322,7 +322,7 @@ export function ActiveFlags() {
               <select
                 value={filters.emotional_state}
                 onChange={(e) => setFilters(prev => ({ ...prev, emotional_state: e.target.value }))}
-                className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                className="px-3 py-2 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors dark:text-white dark:bg-transparent"
               >
                 <option value="">All Emotional States</option>
                 {EMOTIONAL_STATES.map(state => (
@@ -334,7 +334,7 @@ export function ActiveFlags() {
               <select
                 value={filters.need_tag}
                 onChange={(e) => setFilters(prev => ({ ...prev, need_tag: e.target.value }))}
-                className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                className="px-3 py-2 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors dark:text-white dark:bg-transparent"
               >
                 <option value="">All Support Types</option>
                 {NEED_TAGS.map(tag => (
@@ -346,7 +346,7 @@ export function ActiveFlags() {
               <select
                 value={filters.age_range}
                 onChange={(e) => setFilters(prev => ({ ...prev, age_range: e.target.value }))}
-                className="px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                className="px-3 py-2 border border-gray-100 dark:border-gray-700 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors dark:text-white dark:bg-transparent"
               >
                 <option value="">All Age Ranges</option>
                 {AGE_RANGES.map(range => (
@@ -359,22 +359,22 @@ export function ActiveFlags() {
             {hasActiveFilters && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {filters.search && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-100">
                     Search: "{filters.search}"
                   </span>
                 )}
                 {filters.emotional_state && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-secondary-100 text-secondary-800">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-100 text-primary-500">
                     Emotion: {filters.emotional_state}
                   </span>
                 )}
                 {filters.need_tag && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-accent-100 text-accent-800">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-100">
                     Need: {filters.need_tag}
                   </span>
                 )}
                 {filters.age_range && (
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-success-100 text-success-800">
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-100">
                     Age: {filters.age_range}
                   </span>
                 )}
@@ -387,7 +387,7 @@ export function ActiveFlags() {
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <LoadingSpinner size="large" />
-                <p className="text-gray-500 mt-4">Loading support requests...</p>
+                <p className="text-gray-600 dark:text-gray-100 mt-4">Loading support requests...</p>
               </div>
             ) : error ? (
               <div className="bg-red-100 text-red-700 rounded-xl p-4 text-center">
@@ -402,8 +402,8 @@ export function ActiveFlags() {
                 </button>
               </div>
             ) : filteredTickets.length === 0 ? (
-              <div className="text-center py-12 text-gray-500">
-                <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+              <div className="text-center py-12 text-gray-600 dark:text-gray-100">
+                <Users className="w-12 h-12 mx-auto mb-4 text-gray-500 dark:text-gray-100" />
                 <p className="text-lg font-semibold">No support requests found</p>
                 <p className="text-sm mb-4">Try adjusting your filters or check back later.</p>
                 <Link
@@ -416,7 +416,7 @@ export function ActiveFlags() {
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center justify-between mb-4">
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 dark:text-gray-100">
                     {filteredTickets.length} support request{filteredTickets.length !== 1 ? 's' : ''} found
                   </p>
                 </div>
@@ -427,23 +427,23 @@ export function ActiveFlags() {
                       key={ticket.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="border border-gray-200 rounded-2xl p-6 hover:shadow-md transition-all"
+                      className="border border-gray-100 dark:border-gray-700 rounded-2xl p-6 hover:shadow-md transition-all bg-white dark:bg-gray-900"
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-3">
-                            <span className="font-semibold text-gray-900 text-lg">
+                            <span className="font-semibold text-gray-900 dark:text-white text-lg">
                               {ticket.display_name || 'Anonymous'}
                             </span>
                             {ticket.age_range && (
-                              <span className="text-xs bg-primary-100 text-primary-700 rounded-full px-3 py-1">
+                              <span className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-100 rounded-full px-3 py-1">
                                 {ticket.age_range}
                               </span>
                             )}
-                            <span className="text-xs bg-secondary-100 text-secondary-700 rounded-full px-3 py-1">
+                            <span className="text-xs bg-primary-100 text-primary-500 rounded-full px-3 py-1">
                               {ticket.emotional_state}
                             </span>
-                            <div className="flex items-center text-xs text-gray-500">
+                            <div className="flex items-center text-xs text-gray-500 dark:text-gray-100">
                               <Clock className="w-3 h-3 mr-1" />
                               {getTimeAgo(ticket.created_at)}
                             </div>
@@ -451,14 +451,14 @@ export function ActiveFlags() {
                           
                           <div className="flex flex-wrap gap-2 mb-3">
                             {ticket.need_tags && ticket.need_tags.map(tag => (
-                              <span key={tag} className="text-xs bg-accent-100 text-accent-700 rounded-full px-3 py-1">
+                              <span key={tag} className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-100 rounded-full px-3 py-1">
                                 {tag}
                               </span>
                             ))}
                           </div>
                           
                           {ticket.details && (
-                            <p className="text-sm text-gray-700 mb-4">
+                            <p className="text-sm text-gray-600 dark:text-gray-100 mb-4">
                               {typeof ticket.details === 'string' ? ticket.details : JSON.stringify(ticket.details)}
                             </p>
                           )}
@@ -542,7 +542,7 @@ function RequestToConnectButton({ ticketId }: { ticketId: string }) {
   return (
     <div className="mt-3">
       <button
-        className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-xl font-medium transition-all shadow-sm disabled:opacity-60"
+        className="bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-medium transition-all shadow-sm disabled:opacity-60"
         onClick={handleRequest}
         disabled={loading}
       >

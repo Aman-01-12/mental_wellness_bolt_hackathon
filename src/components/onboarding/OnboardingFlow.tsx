@@ -2,10 +2,18 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Heart, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { PersonalityStep } from './steps/PersonalityStep';
+import { LifestyleStep } from './steps/LifestyleStep';
+import { PreferencesStep } from './steps/PreferencesStep';
+import { PrivacyStep } from './steps/PrivacyStep';
 
 const steps = [
   'welcome',
   'basic-info',
+  'personality',
+  'lifestyle',
+  'preferences',
+  'privacy',
   'completion'
 ];
 
@@ -15,7 +23,7 @@ export function OnboardingFlow() {
   const { updateProfile } = useAuthStore();
 
   const handleNext = (stepData?: any) => {
-    if (stepData) {
+    if (stepData && typeof stepData === 'object' && !('window' in stepData) && !('nativeEvent' in stepData)) {
       setFormData(prev => ({ ...prev, ...stepData }));
     }
     
@@ -47,6 +55,14 @@ export function OnboardingFlow() {
         return <WelcomeStep onNext={handleNext} />;
       case 'basic-info':
         return <BasicInfoStep onNext={handleNext} data={formData} />;
+      case 'personality':
+        return <PersonalityStep onNext={handleNext} data={formData} />;
+      case 'lifestyle':
+        return <LifestyleStep onNext={handleNext} data={formData} />;
+      case 'preferences':
+        return <PreferencesStep onNext={handleNext} data={formData} />;
+      case 'privacy':
+        return <PrivacyStep onNext={handleNext} data={formData} />;
       case 'completion':
         return <CompletionStep onComplete={handleComplete} />;
       default:
@@ -95,12 +111,11 @@ export function OnboardingFlow() {
             <div className="flex justify-between mt-8 pt-6 border-t border-gray-100">
               <button
                 onClick={handleBack}
-                className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 transition-colors"
+                className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 transition-colors bg-transparent focus:outline-none"
               >
                 <ChevronLeft className="w-4 h-4" />
                 <span>Back</span>
               </button>
-              
               <div className="text-sm text-gray-400">
                 Use the form above to continue
               </div>
