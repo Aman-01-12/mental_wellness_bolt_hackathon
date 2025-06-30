@@ -55,11 +55,14 @@ export function Navigation() {
         }`}
       >
         {/* Logo and app name */}
-        <div className="flex items-center gap-2 px-6 py-6 border-b border-gray-100">
-          <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
-            <Bot className="w-5 h-5 text-white" />
+        <div className="flex flex-col items-start gap-1 px-6 py-6 border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-primary-500 to-secondary-500 rounded-xl flex items-center justify-center">
+              <Bot className="w-5 h-5 text-white" />
+            </div>
+            <span className="text-2xl font-bold text-primary-700 tracking-tight">MindSpace</span>
           </div>
-          <span className="text-2xl font-bold text-primary-700 tracking-tight">MindSpace</span>
+          <span className="text-xs text-gray-400 ml-10 mt-1">built with bolt.new</span>
         </div>
 
         {/* Scrollable nav and actions */}
