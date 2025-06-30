@@ -62,7 +62,10 @@ export function Navigation() {
             </div>
             <span className="text-2xl font-bold text-primary-700 tracking-tight">MindSpace</span>
           </div>
-          <span className="text-xs text-gray-400 ml-10 mt-1">built with bolt.new</span>
+          <span className="text-xs font-semibold text-accent-500 flex items-center ml-10 mt-1">
+            <svg className="w-3 h-3 mr-1 text-accent-500" fill="currentColor" viewBox="0 0 20 20"><path d="M11.3 1.046a1 1 0 0 1 .7 1.254l-1.1 4.4h3.6a1 1 0 0 1 .8 1.6l-7 10a1 1 0 0 1-1.8-.8l1.1-4.4h-3.6a1 1 0 0 1-.8-1.6l7-10a1 1 0 0 1 .9-.354z"/></svg>
+            built with bolt.new
+          </span>
         </div>
 
         {/* Scrollable nav and actions */}
