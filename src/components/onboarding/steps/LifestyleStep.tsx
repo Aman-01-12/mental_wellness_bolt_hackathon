@@ -149,7 +149,7 @@ export function LifestyleStep({ onNext, data }: LifestyleStepProps) {
             type="range"
             min="4"
             max="12"
-            step="0.5"
+            step="1"
             className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-accent-500"
           />
           <div className="flex justify-between text-xs text-gray-500 mt-1">
