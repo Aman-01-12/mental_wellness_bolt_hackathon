@@ -62,61 +62,64 @@ export function Navigation() {
           <span className="text-2xl font-bold text-primary-700 tracking-tight">MindSpace</span>
         </div>
 
-        {/* Navigation links */}
-        <nav className="flex-1 flex flex-col gap-1 px-2 py-4">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-base ${
-                  isActive
-                    ? 'bg-primary-50 text-primary-700 shadow-sm'
-                    : 'text-gray-700 hover:bg-gray-100 hover:text-primary-700'
-                }`}
-                onClick={() => setSidebarOpen(false)}
-              >
-                <Icon className="w-5 h-5" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+        {/* Scrollable nav and actions */}
+        <div className="flex-1 min-h-0 flex flex-col overflow-y-auto">
+          {/* Navigation links */}
+          <nav className="flex flex-col gap-1 px-2 py-4">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-base ${
+                    isActive
+                      ? 'bg-primary-50 text-primary-700 shadow-sm'
+                      : 'text-gray-700 hover:bg-gray-100 hover:text-primary-700'
+                  }`}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <Icon className="w-5 h-5" />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
 
-        {/* Divider */}
-        <div className="border-t border-gray-100 my-2 mx-4" />
+          {/* Divider */}
+          <div className="border-t border-gray-100 my-2 mx-4" />
 
-        {/* Profile and Sign Out at the bottom */}
-        <div className="flex flex-col gap-1 px-2 pb-6 mt-auto">
-          <Link
-            to="/profile"
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-base ${
-              location.pathname === '/profile'
-                ? 'bg-primary-50 text-primary-700 shadow-sm'
-                : 'text-gray-700 hover:bg-gray-100 hover:text-primary-700'
-            }`}
-            onClick={() => setSidebarOpen(false)}
-          >
-            <User className="w-5 h-5" />
-            Profile
-          </Link>
-          {/* Appearance toggle button */}
-          <button
-            onClick={handleToggleDarkMode}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-base text-gray-700 hover:bg-gray-100 hover:text-primary-700"
-          >
-            {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            Appearance
-          </button>
-          <button
-            onClick={handleSignOut}
-            className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-base text-gray-700 hover:bg-gray-100 hover:text-primary-700"
-          >
-            <LogOut className="w-5 h-5" />
-            Sign Out
-          </button>
+          {/* Profile and Sign Out at the bottom */}
+          <div className="flex flex-col gap-1 px-2 pb-6 mt-auto">
+            <Link
+              to="/profile"
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-base ${
+                location.pathname === '/profile'
+                  ? 'bg-primary-50 text-primary-700 shadow-sm'
+                  : 'text-gray-700 hover:bg-gray-100 hover:text-primary-700'
+              }`}
+              onClick={() => setSidebarOpen(false)}
+            >
+              <User className="w-5 h-5" />
+              Profile
+            </Link>
+            {/* Appearance toggle button */}
+            <button
+              onClick={handleToggleDarkMode}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-base text-gray-700 hover:bg-gray-100 hover:text-primary-700"
+            >
+              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              Appearance
+            </button>
+            <button
+              onClick={handleSignOut}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all text-base text-gray-700 hover:bg-gray-100 hover:text-primary-700"
+            >
+              <LogOut className="w-5 h-5" />
+              Sign Out
+            </button>
+          </div>
         </div>
       </aside>
 
